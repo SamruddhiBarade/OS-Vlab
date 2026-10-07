@@ -1,0 +1,2661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OS Virtual Lab - Interactive Educational Platform</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            palette: {
+              white: '#ffffff',
+              beige: '#fdf6e2',
+              purple: '#7e22ce',
+              purpleLight: '#f3e8ff',
+              purpleAccent: '#a855f7',
+              pink: '#ec4899',
+              lightBlue: '#0284c7',
+              lightBlueBg: '#e0f2fe',
+              yellow: '#f59e0b',
+              yellowLight: '#fef3c7',
+              red: '#ef4444',
+              brown: '#78350f',
+              burgundy: '#701a75',
+              plum: '#3b0764'
+            }
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', '"Outfit"', 'sans-serif'],
+            mono: ['"Fira Code"', 'monospace']
+          },
+          keyframes: {
+            slideUp: {
+              '0%': { transform: 'translateY(15px)', opacity: '0' },
+              '100%': { transform: 'translateY(0)', opacity: '1' }
+            },
+            pulseSlow: {
+              '0%, 100%': { transform: 'scale(1)' },
+              '50%': { transform: 'scale(1.04)' }
+            },
+            float: {
+              '0%, 100%': { transform: 'translateY(0px)' },
+              '50%': { transform: 'translateY(-6px)' }
+            }
+          },
+          animation: {
+            'slide-up': 'slideUp 0.35s ease-out forwards',
+            'pulse-slow': 'pulseSlow 2.5s infinite ease-in-out',
+            'float': 'float 3s infinite ease-in-out'
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- React 18 & Babel UMD -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Lucide Icons UMD -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
+  <!-- Google Fonts: Plus Jakarta Sans, Outfit & Fira Code -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', 'Outfit', sans-serif;
+      background-color: #fdf6e2;
+      color: #3b0764;
+      overflow-x: hidden;
+    }
+    #root {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    code, pre, .font-mono {
+      font-family: 'Fira Code', monospace;
+    }
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #fdf6e2;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #78350f;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #701a75;
+    }
+    .shadow-pop {
+      box-shadow: 0 12px 30px -5px rgba(112, 26, 117, 0.15), 0 4px 10px -2px rgba(120, 53, 15, 0.08);
+    }
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #certificate-print-area, #certificate-print-area * {
+        visibility: visible;
+      }
+      #certificate-print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body class="bg-[#fdf6e2] text-[#3b0764] min-h-screen">
+  <div id="root"></div>
+
+  <!-- Main Application Script -->
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // -------------------------------------------------------------
+    // DATA DEFINITIONS (10 OS MODULES WITH 5 QUIZZES EACH)
+    // -------------------------------------------------------------
+    const MODULES_DATA = [
+      {
+        id: "process-management",
+        num: 1,
+        title: "Process Management",
+        category: "Core OS",
+        shortDesc: "Understand PCB structures, state transitions (New, Ready, Running, Waiting, Terminated), context switching, and fork/exec.",
+        icon: "cpu",
+        color: "bg-gradient-to-r from-purple-600 to-pink-600",
+        learn: {
+          overview: "A process is a program in execution. The operating system kernel manages processes by creating them, scheduling CPU execution, handling state transitions, and reclaiming resources upon completion.",
+          keyTerms: [
+            { term: "PCB (Process Control Block)", definition: "Data structure storing PID, state, PC, CPU registers, and memory bounds." },
+            { term: "Context Switch", definition: "Saving state of running process into its PCB and restoring state of next process." },
+            { term: "Process Lifecycle", definition: "5 primary states: New -> Ready -> Running -> Waiting -> Terminated." },
+            { term: "Forking", definition: "System call creating an exact child process duplicate of the calling parent." }
+          ],
+          analogy: "A process is like a chef cooking a recipe. The recipe is static code. The chef executing steps with ingredients (registers/stack) is the active process."
+        },
+        task: {
+          title: "Process State Sequence Challenge",
+          instructions: "Select the correct sequence of states a process moves through when it requests I/O while running, completes I/O, and finishes execution.",
+          question: "Which sequence correctly represents an I/O request lifecycle?",
+          options: [
+            "Running → Waiting → Ready → Running → Terminated",
+            "Running → Ready → Waiting → Running → Terminated",
+            "Running → Waiting → Terminated → Ready",
+            "Ready → Running → Waiting → Terminated"
+          ],
+          correctAnswer: 0,
+          explanation: "When I/O is requested during execution, the process enters Waiting. Once I/O completes, it moves to Ready. The scheduler dispatches it back to Running, where it completes and enters Terminated."
+        },
+        quiz: [
+          { id: "pm_1", question: "Which component holds temporary local variables and function parameters?", options: ["Data Section", "Heap Section", "Stack Section", "Text Section"], correctIndex: 2, explanation: "The Process Stack contains local variables, parameters, and return addresses." },
+          { id: "pm_2", question: "What happens during a Context Switch?", options: ["RAM is formatted", "PCB state is saved and next PCB loaded", "Process is deleted", "CPU speed doubles"], correctIndex: 1, explanation: "Context switching saves execution state in active PCB and restores another process PCB." },
+          { id: "pm_3", question: "What system call creates a duplicate child process in UNIX?", options: ["exec()", "fork()", "signal()", "wait()"], correctIndex: 1, explanation: "The fork() system call creates an exact duplicate process as a child." },
+          { id: "pm_4", question: "Which state does a process enter right after creation?", options: ["Running", "Waiting", "New", "Ready"], correctIndex: 2, explanation: "A process is initially created in the New state before being admitted to Ready." },
+          { id: "pm_5", question: "A process that has finished execution but whose parent has not yet called wait() is called a:", options: ["Orphan Process", "Zombie Process", "Daemon Process", "Background Process"], correctIndex: 1, explanation: "A Zombie process is terminated but retains an entry in the process table until parent reads exit status." }
+        ]
+      },
+      {
+        id: "cpu-scheduling",
+        num: 2,
+        title: "CPU Scheduling",
+        category: "Scheduling",
+        shortDesc: "Simulate FCFS, SJF, Round Robin, and Priority scheduling algorithms with interactive custom Gantt charts.",
+        icon: "clock",
+        color: "bg-gradient-to-r from-pink-500 to-purple-600",
+        learn: {
+          overview: "CPU scheduling allocates CPU cores to ready processes to maximize utilization and throughput while minimizing waiting time and turnaround time.",
+          keyTerms: [
+            { term: "Burst Time", definition: "Amount of CPU execution time required by a process." },
+            { term: "Turnaround Time (TAT)", definition: "Completion Time minus Arrival Time." },
+            { term: "Waiting Time (WT)", definition: "Total time spent waiting in the ready queue (TAT - Burst Time)." },
+            { term: "Time Quantum", definition: "Fixed CPU execution time slice assigned in Round Robin scheduling." }
+          ],
+          analogy: "Like a bank teller serving customers. FCFS serves in arrival order. SJF serves quickest transactions first. Round Robin gives 2 minutes per person."
+        },
+        task: {
+          title: "Custom Process Scheduling Calculator",
+          instructions: "Enter your custom burst times below to calculate average waiting time and render the visual Gantt Chart.",
+          question: "Calculate Average Waiting Time for 3 processes arriving at time 0 with burst times: P1=24ms, P2=3ms, P3=3ms under FCFS.",
+          options: ["17.0 ms", "9.0 ms", "12.0 ms", "8.0 ms"],
+          correctAnswer: 0,
+          explanation: "Waiting times: P1=0ms, P2=24ms, P3=27ms. Sum = 51ms. Average = 51 / 3 = 17.0 ms."
+        },
+        quiz: [
+          { id: "cs_1", question: "Which algorithm gives minimum average waiting time for a given set of processes?", options: ["FCFS", "Shortest Job First (SJF)", "Round Robin", "Priority Scheduling"], correctIndex: 1, explanation: "SJF is provably optimal for minimizing average waiting time." },
+          { id: "cs_2", question: "Which CPU scheduling algorithm is non-preemption based by definition?", options: ["Round Robin", "SRTF", "FCFS", "Preemptive Priority"], correctIndex: 2, explanation: "First-Come First-Served (FCFS) executes processes until completion without preemption." },
+          { id: "cs_3", question: "What problem can occur in Priority Scheduling where low-priority processes never execute?", options: ["Convoy Effect", "Starvation", "Thrashing", "Belady's Anomaly"], correctIndex: 1, explanation: "Starvation occurs when low priority tasks wait indefinitely; solved by Aging." },
+          { id: "cs_4", question: "Round Robin scheduling performance depends heavily on the size of:", options: ["Memory Size", "Time Quantum", "Process ID", "I/O Burst Time"], correctIndex: 1, explanation: "If time quantum is too large, RR reverts to FCFS; if too small, context switch overhead dominates." },
+          { id: "cs_5", question: "Turnaround Time (TAT) is calculated as:", options: ["Completion Time - Arrival Time", "Waiting Time + Arrival Time", "Burst Time - Waiting Time", "Completion Time + Burst Time"], correctIndex: 0, explanation: "Turnaround Time = Completion Time - Arrival Time." }
+        ]
+      },
+      {
+        id: "threads",
+        num: 3,
+        title: "Threads & Concurrency",
+        category: "Concurrency",
+        shortDesc: "Explore lightweight execution units, multithreading models, shared memory, and race condition prevention with Mutex locks.",
+        icon: "git-fork",
+        color: "bg-gradient-to-r from-purple-500 to-indigo-600",
+        learn: {
+          overview: "A thread is a basic unit of CPU execution comprising a thread ID, program counter, registers, and stack, sharing code/data sections with sibling threads.",
+          keyTerms: [
+            { term: "User Threads", definition: "Threads managed in user space without kernel intervention." },
+            { term: "Kernel Threads", definition: "Threads managed directly by the operating system kernel." },
+            { term: "Race Condition", definition: "Concurrent shared data access flaw where outcome depends on execution timing." }
+          ],
+          analogy: "A process is a factory building. Threads are multiple workers inside sharing the workspace and tools."
+        },
+        task: {
+          title: "Race Condition Analyzer",
+          instructions: "Two threads increment variable x=5 concurrently without locks.",
+          question: "What are possible final values of x if non-atomic steps interleave?",
+          options: ["Only 7", "6 or 7", "5 or 6", "6 only"],
+          correctAnswer: 1,
+          explanation: "If both read x=5 before either writes back, both write 6. If executed sequentially, result is 7. Thus 6 or 7."
+        },
+        quiz: [
+          { id: "th_1", question: "Which resource is SHARED among threads of the same process?", options: ["Registers", "Stack", "Program Counter", "Data Section & Heap"], correctIndex: 3, explanation: "Threads share global variables, static data, open files, and heap space." },
+          { id: "th_2", question: "What is unique to each individual thread inside a process?", options: ["Address Space", "Stack and Program Counter", "Global Variables", "File Descriptors"], correctIndex: 1, explanation: "Each thread maintains its own call stack, CPU registers, and program counter." },
+          { id: "th_3", question: "In Many-to-One multithreading model, if one thread makes a blocking system call:", options: ["Only that thread blocks", "Entire process blocks", "Kernel creates new thread", "CPU halts"], correctIndex: 1, explanation: "Since user threads map to a single kernel thread, one blocking system call blocks the entire process." },
+          { id: "th_4", question: "What mechanism is used to make code thread-safe by locking critical sections?", options: ["Mutex Lock", "Semaphore", "Atomic Flags", "All of the above"], correctIndex: 3, explanation: "Mutex locks, semaphores, and atomic variables are all standard thread synchronization primitives." },
+          { id: "th_5", question: "Hyper-Threading technology allows a single CPU core to:", options: ["Execute multiple threads simultaneously via hardware context", "Increase RAM speed", "Emulate disk storage", "Bypass OS kernel"], correctIndex: 0, explanation: "Hardware hyper-threading duplicates architectural state to run multiple hardware threads per core." }
+        ]
+      },
+      {
+        id: "process-sync",
+        num: 4,
+        title: "Process Synchronization",
+        category: "Concurrency",
+        shortDesc: "Master Mutex locks, Semaphores, Producer-Consumer bounded buffers, and the Dining Philosophers problem.",
+        icon: "lock",
+        color: "bg-gradient-to-r from-amber-500 to-pink-600",
+        learn: {
+          overview: "Process synchronization coordinates concurrent execution to ensure data consistency in critical section code access.",
+          keyTerms: [
+            { term: "Critical Section", definition: "Code segment accessing shared variables or hardware resources." },
+            { term: "Mutex Lock", definition: "Binary lock enforcing mutual exclusion in critical sections." },
+            { term: "Semaphore", definition: "Atomic integer variable accessed via wait() and signal() operations." }
+          ],
+          analogy: "A restroom with a single key card (Mutex). Only the key card holder can enter; others queue outside."
+        },
+        task: {
+          title: "Semaphore Value Calculator",
+          instructions: "Initial Semaphore S = 5. Sequence: 8 wait(S) operations followed by 5 signal(S) operations.",
+          question: "What is the final value of Semaphore S?",
+          options: ["2", "5", "0", "-3"],
+          correctAnswer: 0,
+          explanation: "Initial S=5. 8 wait operations: 5 - 8 = -3. 5 signal operations: -3 + 5 = 2."
+        },
+        quiz: [
+          { id: "ps_1", question: "Which requirement ensures no process waits indefinitely to enter critical section?", options: ["Mutual Exclusion", "Bounded Waiting", "Progress", "Preemption"], correctIndex: 1, explanation: "Bounded Waiting guarantees a limit on waiting requests." },
+          { id: "ps_2", question: "What are the two atomic operations allowed on a Counting Semaphore S?", options: ["lock() & unlock()", "wait() [P] & signal() [V]", "push() & pop()", "start() & stop()"], correctIndex: 1, explanation: "Semaphores are modified exclusively via atomic wait() and signal() calls." },
+          { id: "ps_3", question: "A Semaphore initialized to 1 behaves as a:", options: ["Counting Semaphore", "Mutex / Binary Semaphore", "Condition Variable", "Barrier"], correctIndex: 1, explanation: "A semaphore initialized to 1 acts as a binary semaphore or mutex lock." },
+          { id: "ps_4", question: "In Peterson's Solution for 2 processes, synchronization is achieved using:", options: ["Hardware TestAndSet", "turn variable and flag array", "Kernel semaphores", "CPU interrupt disable"], correctIndex: 1, explanation: "Peterson's algorithm uses a turn variable and flag[2] array for software mutual exclusion." },
+          { id: "ps_5", question: "In the Bounded-Buffer Producer-Consumer problem, which semaphores are typically required?", options: ["mutex, full, empty", "read, write, lock", "head, tail, count", "push, pop, top"], correctIndex: 0, explanation: "Standard solution uses mutex for mutual exclusion, full for item count, empty for free slots." }
+        ]
+      },
+      {
+        id: "deadlocks",
+        num: 5,
+        title: "Deadlocks",
+        category: "Concurrency",
+        shortDesc: "Analyze Coffman conditions, Resource Allocation Graphs (RAG), Banker's Algorithm safety matrix, and recovery.",
+        icon: "alert-triangle",
+        color: "bg-gradient-to-r from-red-500 to-purple-600",
+        learn: {
+          overview: "A deadlock occurs when a set of processes are permanently blocked because each holds a resource and waits for another resource held by another process.",
+          keyTerms: [
+            { term: "Coffman Conditions", definition: "Mutual Exclusion, Hold & Wait, No Preemption, Circular Wait." },
+            { term: "Banker's Algorithm", definition: "Deadlock avoidance algorithm testing for safe execution sequences." },
+            { term: "Safe State", definition: "State where a process sequence exists to satisfy all maximum resource claims." }
+          ],
+          analogy: "4 cars arriving simultaneously at a 4-way stop intersection blocking each other in a circle."
+        },
+        task: {
+          title: "Banker's Need Matrix Task",
+          instructions: "Allocation = [2, 1, 1], Max = [4, 3, 3] for process P0.",
+          question: "Calculate the Need vector for process P0.",
+          options: ["[2, 2, 2]", "[6, 4, 4]", "[2, 1, 1]", "[1, 2, 2]"],
+          correctAnswer: 0,
+          explanation: "Need = Max - Allocation = [4-2, 3-1, 3-1] = [2, 2, 2]."
+        },
+        quiz: [
+          { id: "dl_1", question: "Which condition is NOT one of 4 necessary Coffman conditions?", options: ["Mutual Exclusion", "Circular Wait", "Preemption Allowed", "Hold and Wait"], correctIndex: 2, explanation: "No Preemption is a Coffman condition. Preemption Allowed prevents deadlock." },
+          { id: "dl_2", question: "In a Resource Allocation Graph with single instances per resource, deadlock exists IF AND ONLY IF:", options: ["There are > 5 processes", "The graph contains a directed cycle", "CPU utilization is 100%", "Memory is exhausted"], correctIndex: 1, explanation: "With single-instance resources, a cycle in the RAG is necessary and sufficient for deadlock." },
+          { id: "dl_3", question: "Banker's Algorithm is primarily used for deadlock:", options: ["Prevention", "Avoidance", "Detection", "Recovery"], correctIndex: 1, explanation: "Banker's Algorithm dynamically avoids deadlocks by maintaining a safe state." },
+          { id: "dl_4", question: "What formula determines the Need matrix in Banker's Algorithm?", options: ["Need = Max - Allocation", "Need = Allocation + Available", "Need = Max + Available", "Need = Allocation - Max"], correctIndex: 0, explanation: "Need[i][j] = Max[i][j] - Allocation[i][j]." },
+          { id: "dl_5", question: "Which strategy breaks deadlock by terminating one or more processes?", options: ["Ostrich Algorithm", "Deadlock Recovery", "Deadlock Avoidance", "Resource Preemption"], correctIndex: 1, explanation: "Deadlock Recovery involves process termination or resource preemption." }
+        ]
+      },
+      {
+        id: "memory-management",
+        num: 6,
+        title: "Memory Management",
+        category: "Memory",
+        shortDesc: "Explore contiguous allocation strategies: First-Fit, Best-Fit, Worst-Fit, internal and external fragmentation.",
+        icon: "database",
+        color: "bg-gradient-to-r from-purple-600 to-yellow-600",
+        learn: {
+          overview: "Memory management divides physical RAM into partitions, allocates memory to processes, and reclaims space upon termination.",
+          keyTerms: [
+            { term: "External Fragmentation", definition: "Total free memory is sufficient, but split into non-contiguous small holes." },
+            { term: "First-Fit", definition: "Allocates the first hole large enough for an incoming process." },
+            { term: "Best-Fit", definition: "Allocates the smallest hole large enough, leaving smallest leftover space." },
+            { term: "Worst-Fit", definition: "Allocates the largest hole, leaving largest leftover space." }
+          ],
+          analogy: "Parking cars in a lot. First-fit takes first open slot. Best-fit finds tightest slot. Worst-fit picks largest RV slot."
+        },
+        task: {
+          title: "Memory Allocation Strategy Test",
+          instructions: "Available Holes: 100KB, 500KB, 200KB, 300KB, 600KB. Process requests 212KB.",
+          question: "Which hole will Best-Fit choose?",
+          options: ["500KB hole", "300KB hole", "600KB hole", "200KB hole"],
+          correctAnswer: 1,
+          explanation: "Best-Fit picks smallest hole >= 212KB. 300KB is the smallest suitable hole."
+        },
+        quiz: [
+          { id: "mm_1", question: "Which strategy leaves largest leftover hole after allocation?", options: ["First-Fit", "Best-Fit", "Worst-Fit", "Next-Fit"], correctIndex: 2, explanation: "Worst-Fit specifically picks largest available hole." },
+          { id: "mm_2", question: "Unused memory space within an allocated memory block is called:", options: ["External Fragmentation", "Internal Fragmentation", "Compaction", "Paging Overhead"], correctIndex: 1, explanation: "Internal fragmentation occurs when allocated block is larger than requested size." },
+          { id: "mm_3", question: "Which technique reshuffles memory contents to merge all free space into one large block?", options: ["Paging", "Segmentation", "Compaction", "Swapping"], correctIndex: 2, explanation: "Compaction shifts active memory partitions to eliminate external fragmentation." },
+          { id: "mm_4", question: "In dynamic relocation, physical address is calculated as:", options: ["Logical Address + Relocation Base Register", "Logical Address * Page Size", "Base Register - Limit Register", "Offset - Base Register"], correctIndex: 0, explanation: "Hardware MMU adds base register value to relative logical address." },
+          { id: "mm_5", question: "Which memory allocation strategy searches from the beginning of memory and picks the first suitable hole?", options: ["First-Fit", "Next-Fit", "Best-Fit", "Worst-Fit"], correctIndex: 0, explanation: "First-Fit scans memory from start and allocates first hole that fits." }
+        ]
+      },
+      {
+        id: "paging",
+        num: 7,
+        title: "Paging & Virtual Memory",
+        category: "Memory",
+        shortDesc: "Understand fixed-size pages, physical frames, page tables, logical to physical address translation, and TLB lookups.",
+        icon: "layers",
+        color: "bg-gradient-to-r from-pink-600 to-purple-600",
+        learn: {
+          overview: "Paging divides logical memory into fixed-size Pages and RAM into same-sized Frames. The CPU MMU maps page number p to frame f using a Page Table.",
+          keyTerms: [
+            { term: "Page & Frame", definition: "Page is logical block; Frame is physical RAM block of identical size." },
+            { term: "TLB", definition: "Translation Lookaside Buffer high-speed associative hardware cache for address translation." }
+          ],
+          analogy: "A book Table of Contents mapping logical chapter numbers to physical printed page numbers."
+        },
+        task: {
+          title: "Address Translation Calculator",
+          instructions: "Page Size = 1024 bytes (1KB). Logical Address has Page p=2, Offset d=400. Page 2 maps to Frame 5.",
+          question: "What is the calculated physical address?",
+          options: ["5520", "2448", "5120", "4496"],
+          correctAnswer: 0,
+          explanation: "Physical Address = (Frame * Page Size) + Offset = (5 * 1024) + 400 = 5520."
+        },
+        quiz: [
+          { id: "pg_1", question: "Hardware component that accelerates address translation:", options: ["DMA", "TLB (Translation Lookaside Buffer)", "ALU", "Cache Controller"], correctIndex: 1, explanation: "TLB caches recent page-to-frame translations." },
+          { id: "pg_2", question: "If Page Size is 4KB (4096 bytes), how many bits are required for page offset (d)?", options: ["10 bits", "12 bits", "16 bits", "8 bits"], correctIndex: 1, explanation: "2^12 = 4096 bytes, so 12 offset bits are required." },
+          { id: "pg_3", question: "Does paging eliminate external fragmentation?", options: ["Yes, completely", "No, it increases it", "Only for 64-bit systems", "Only when TLB is used"], correctIndex: 0, explanation: "Paging uses fixed-size blocks, completely eliminating external fragmentation." },
+          { id: "pg_4", question: "What is a major advantage of Inverted Page Tables over standard page tables?", options: ["Faster lookup", "Fixed table size proportional to physical RAM, saving memory", "Eliminates TLB misses", "No page faults"], correctIndex: 1, explanation: "Inverted Page Tables maintain one entry per physical frame instead of per logical page." },
+          { id: "pg_5", question: "The percentage of time a page translation is found in TLB is called:", options: ["Page Hit Rate", "TLB Hit Ratio", "Frame Rate", "Cache Coherency"], correctIndex: 1, explanation: "TLB Hit Ratio measures the percentage of translations satisfied directly by TLB cache." }
+        ]
+      },
+      {
+        id: "page-replacement",
+        num: 8,
+        title: "Page Replacement",
+        category: "Memory",
+        shortDesc: "Simulate page fault handling with FIFO, LRU, and Optimal replacement algorithms and Belady's anomaly.",
+        icon: "refresh-cw",
+        color: "bg-gradient-to-r from-purple-600 to-lightBlue",
+        learn: {
+          overview: "Virtual memory loads pages on demand. When a requested page is not in RAM, a Page Fault occurs, requiring page replacement to select a victim frame.",
+          keyTerms: [
+            { term: "Page Fault", definition: "Interrupt raised when accessing a page not present in RAM." },
+            { term: "FIFO", definition: "Replaces oldest page loaded first." },
+            { term: "LRU", definition: "Replaces page not used for longest time period." },
+            { term: "Belady's Anomaly", definition: "Increasing frame count increases page fault count (occurs in FIFO)." }
+          ],
+          analogy: "A workbench with 3 tools. When needing a wrench not on workbench, you put back tool untouched longest (LRU)."
+        },
+        task: {
+          title: "FIFO Page Fault Tracing",
+          instructions: "Reference string: 7, 0, 1, 2 with 3 empty page frames under FIFO.",
+          question: "How many total page faults occur?",
+          options: ["4", "3", "5", "2"],
+          correctAnswer: 0,
+          explanation: "7 (Fault [7]), 0 (Fault [7,0]), 1 (Fault [7,0,1]), 2 (Fault replaces 7 -> [2,0,1]). Total 4 faults."
+        },
+        quiz: [
+          { id: "pr_1", question: "Which algorithm suffers from Belady's Anomaly?", options: ["Optimal", "LRU", "FIFO", "MRU"], correctIndex: 2, explanation: "FIFO can exhibit Belady's Anomaly." },
+          { id: "pr_2", question: "Which page replacement algorithm is provably optimal but impractical in real systems?", options: ["LRU", "FIFO", "Optimal (OPT)", "Second-Chance"], correctIndex: 2, explanation: "Optimal algorithm requires knowledge of future page reference string." },
+          { id: "pr_3", question: "LRU page replacement replaces the page that has:", options: ["Been used most recently", "Not been used for longest period of time", "Smallest page number", "Highest priority"], correctIndex: 1, explanation: "LRU replaces page unused for the longest past time interval." },
+          { id: "pr_4", question: "What is Thrashing in Operating Systems?", options: ["CPU fan running fast", "High page fault rate where OS spends more time paging than executing", "Disk drive failure", "Deadlock between RAM blocks"], correctIndex: 1, explanation: "Thrashing occurs when active working set exceeds RAM, causing continuous page swapping." },
+          { id: "pr_5", question: "Second-Chance (Clock) algorithm uses which bit in page table entry?", options: ["Modify Bit", "Reference Bit", "Valid/Invalid Bit", "Protection Bit"], correctIndex: 1, explanation: "Clock algorithm inspects reference bit (0 or 1) to give pages a second chance." }
+        ]
+      },
+      {
+        id: "disk-scheduling",
+        num: 9,
+        title: "Disk Scheduling",
+        category: "Storage",
+        shortDesc: "Visualize disk head movements across cylinders for FCFS, SSTF, SCAN (Elevator), C-SCAN, and LOOK.",
+        icon: "hard-drive",
+        color: "bg-gradient-to-r from-yellow-500 to-purple-600",
+        learn: {
+          overview: "Disk scheduling manages magnetic disk head arm seek movements to minimize total seek distance and maximize I/O throughput.",
+          keyTerms: [
+            { term: "Seek Time", definition: "Time for disk head arm to move to target cylinder track." },
+            { term: "SSTF", definition: "Services request closest to current head position." },
+            { term: "SCAN (Elevator)", definition: "Moves head from one end to another servicing requests along path." }
+          ],
+          analogy: "Skyscraper elevator moving continuously floor to floor servicing requested stops."
+        },
+        task: {
+          title: "Total Head Movement Calculation",
+          instructions: "Disk Head at 50. Queue: [82, 170, 43].",
+          question: "Calculate total cylinder head movement under FCFS.",
+          options: ["247 cylinders", "277 cylinders", "150 cylinders", "300 cylinders"],
+          correctAnswer: 0,
+          explanation: "|82-50| = 32. |170-82| = 88. |43-170| = 127. Total = 32 + 88 + 127 = 247."
+        },
+        quiz: [
+          { id: "ds_1", question: "Algorithm servicing requests with minimum seek time relative to current position:", options: ["FCFS", "SSTF", "SCAN", "LOOK"], correctIndex: 1, explanation: "SSTF chooses request with shortest seek distance." },
+          { id: "ds_2", question: "Which disk scheduling algorithm moves head in one direction servicing requests, then immediately returns to start without servicing on return trip?", options: ["SCAN", "C-SCAN", "LOOK", "FCFS"], correctIndex: 1, explanation: "Circular SCAN (C-SCAN) provides uniform wait time by servicing in one direction only." },
+          { id: "ds_3", question: "What component of disk access time dominates total latency?", options: ["Rotational Latency", "Transfer Time", "Seek Time", "Controller Time"], correctIndex: 2, explanation: "Seek time (moving head arm to cylinder) is the longest physical delay." },
+          { id: "ds_4", question: "In LOOK scheduling, how does it differ from SCAN?", options: ["Goes all the way to disk boundary cylinder 0 or Max", "Reverses direction at last request without going to boundary cylinder", "Services requests randomly", "Ignores seek distance"], correctIndex: 1, explanation: "LOOK reverses direction at the highest/lowest requested track without visiting boundary ends." },
+          { id: "ds_5", question: "Which algorithm avoids starvation compared to SSTF while keeping seek time low?", options: ["FCFS", "SCAN / Elevator", "Random", "FIFO"], correctIndex: 1, explanation: "SCAN algorithm prevents starvation by sweeping across cylinders systematically." }
+        ]
+      },
+      {
+        id: "file-systems",
+        num: 10,
+        title: "File Systems",
+        category: "Storage",
+        shortDesc: "Inspect directory trees, file control blocks, Contiguous, Linked, and Indexed file allocation (Inodes).",
+        icon: "folder-tree",
+        color: "bg-gradient-to-r from-pink-500 to-burgundy",
+        learn: {
+          overview: "File systems map logical files to physical disk blocks using Contiguous, Linked, or Indexed (Inode) allocation strategies.",
+          keyTerms: [
+            { term: "Inode (FCB)", definition: "Data structure storing file metadata and direct/indirect disk block pointers." },
+            { term: "Indexed Allocation", definition: "Brings all file block pointers into an Index Block for direct block access." }
+          ],
+          analogy: "Indexed allocation is like a book index pointing directly to specific page numbers."
+        },
+        task: {
+          title: "Indexed Block Lookup Task",
+          instructions: "Index Block at sector 5 contains pointers: [4, 7, 12, 15].",
+          question: "Which disk sector contains logical block index 2?",
+          options: ["Sector 12", "Sector 7", "Sector 4", "Sector 15"],
+          correctAnswer: 0,
+          explanation: "Logical index 0->4, 1->7, 2->12, 3->15. Logical index 2 maps to Sector 12."
+        },
+        quiz: [
+          { id: "fs_1", question: "Method allowing direct access WITHOUT external fragmentation:", options: ["Contiguous", "Linked", "Indexed Allocation", "FAT"], correctIndex: 2, explanation: "Indexed allocation supports direct access via index block without external fragmentation." },
+          { id: "fs_2", question: "What data structure in UNIX file systems contains file permissions, owner, size, and block pointers?", options: ["Superblock", "Inode", "Directory Entry", "Partition Table"], correctIndex: 1, explanation: "An Inode (Index Node) holds file metadata and data block pointers." },
+          { id: "fs_3", question: "Which file allocation method suffers from external fragmentation?", options: ["Contiguous Allocation", "Linked Allocation", "Indexed Allocation", "FAT Allocation"], correctIndex: 0, explanation: "Contiguous allocation requires contiguous disk sectors, leading to external fragmentation." },
+          { id: "fs_4", question: "In Linked File Allocation, accessing block N of a file requires:", options: ["Direct index lookup", "Sequential traversal through preceding N-1 pointers", "Binary search", "Hash table"], correctIndex: 1, explanation: "Linked allocation requires following pointer pointers from block 0 sequentially." },
+          { id: "fs_5", question: "Virtual File System (VFS) layer in modern OS enables:", options: ["Multiple different file systems to be accessed via uniform API", "Faster disk spin rate", "Automatic RAM expansion", "GUI file rendering"], correctIndex: 0, explanation: "VFS provides an abstract object-oriented interface for diverse filesystems (ext4, NTFS, FAT)." }
+        ]
+      }
+    ];
+
+    const ACHIEVEMENTS = [
+      { id: "first_step", title: "First OS Step", desc: "Completed your first virtual lab activity!" },
+      { id: "scholar", title: "OS Scholar", desc: "Completed 5 full OS modules!" },
+      { id: "master", title: "OS Virtual Lab Master", desc: "Achieved 100% completion across all 10 OS modules!" }
+    ];
+
+    // -------------------------------------------------------------
+    // STUDENT LOGIN VIEW
+    // -------------------------------------------------------------
+    function LoginView({ onLogin }) {
+      const [name, setName] = useState('');
+      const [rollNo, setRollNo] = useState('');
+      const [dept, setDept] = useState('Computer Science & Engineering');
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!name.trim()) return;
+        onLogin({
+          name: name.trim(),
+          rollNo: rollNo.trim() || 'CS-2026-001',
+          dept: dept.trim() || 'Computer Science'
+        });
+      };
+
+      const handleDemoLogin = () => {
+        onLogin({
+          name: 'Alex Morgan',
+          rollNo: 'CS-2026-042',
+          dept: 'Computer Science & Engineering'
+        });
+      };
+
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-[#fdf6e2] via-[#f3e8ff] to-[#fdf6e2] flex items-center justify-center p-4">
+          <div className="bg-white border-4 border-[#701a75] p-8 sm:p-12 rounded-3xl max-w-md w-full space-y-6 shadow-pop animate-slide-up relative">
+            <div className="text-center space-y-3">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#701a75] to-[#ec4899] flex items-center justify-center text-white mx-auto shadow-lg animate-float">
+                <i data-lucide="cpu" className="w-8 h-8"></i>
+              </div>
+              <div>
+                <span className="text-[10px] font-mono bg-[#f3e8ff] text-[#701a75] border border-[#701a75] px-3 py-1 rounded-full font-black uppercase tracking-wider">
+                  Student Virtual Portal v6.0
+                </span>
+                <h1 className="text-2xl sm:text-3xl font-black text-[#3b0764] mt-2">
+                  OS Virtual Lab Login
+                </h1>
+                <p className="text-xs text-[#78350f] font-extrabold mt-1">
+                  Enter your student credentials to access 10 interactive OS virtual lab modules
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4 font-mono text-xs">
+              <div className="space-y-1">
+                <label className="text-[#701a75] font-black">Student Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="e.g. Alex Morgan"
+                  className="w-full bg-[#fdf6e2] border-2 border-[#701a75] px-3.5 py-2.5 rounded-xl font-black text-[#701a75] outline-none focus:ring-2 focus:ring-[#ec4899]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[#701a75] font-black">Student ID / Roll No.</label>
+                <input
+                  type="text"
+                  value={rollNo}
+                  onChange={e => setRollNo(e.target.value)}
+                  placeholder="e.g. CS-2026-042"
+                  className="w-full bg-[#fdf6e2] border-2 border-[#701a75] px-3.5 py-2.5 rounded-xl font-black text-[#701a75] outline-none focus:ring-2 focus:ring-[#ec4899]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[#701a75] font-black">Department / Major</label>
+                <input
+                  type="text"
+                  value={dept}
+                  onChange={e => setDept(e.target.value)}
+                  placeholder="e.g. Computer Science & Engineering"
+                  className="w-full bg-[#fdf6e2] border-2 border-[#701a75] px-3.5 py-2.5 rounded-xl font-black text-[#701a75] outline-none focus:ring-2 focus:ring-[#ec4899]"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-4 bg-gradient-to-r from-[#701a75] to-[#7e22ce] text-white font-black text-sm rounded-2xl shadow-lg hover:scale-[1.02] transition mt-2"
+              >
+                🚀 Enter Virtual Lab ➔
+              </button>
+            </form>
+
+            <div className="border-t border-[#701a75]/20 pt-4 text-center">
+              <button
+                type="button"
+                onClick={handleDemoLogin}
+                className="text-xs text-[#701a75] font-black hover:underline"
+              >
+                ⚡ Quick Demo Login (Skip Form)
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // MAIN APP COMPONENT
+    // -------------------------------------------------------------
+    function App() {
+      const [user, setUser] = useState(() => {
+        const saved = localStorage.getItem('os_virtlab_user_v1');
+        if (saved) {
+          try { return JSON.parse(saved); } catch (e) {}
+        }
+        return null;
+      });
+
+      const [currentModuleId, setCurrentModuleId] = useState(null); // null = Dashboard
+      const [currentStep, setCurrentStep] = useState(1);
+      const [sidebarOpen, setSidebarOpen] = useState(false);
+      const [showGraduation, setShowGraduation] = useState(false);
+      const [showBadgeModal, setShowBadgeModal] = useState(false);
+      const [studentName, setStudentName] = useState(() => user ? user.name : 'Alex Morgan');
+      const [taskModal, setTaskModal] = useState(null); // { stepName, onNext }
+      const [toast, setToast] = useState(null); // { message, type }
+
+      const handleLogin = (userData) => {
+        setUser(userData);
+        setStudentName(userData.name);
+        localStorage.setItem('os_virtlab_user_v1', JSON.stringify(userData));
+        showNotification(`👋 Welcome ${userData.name}! Logged into OS Virtual Lab.`);
+      };
+
+      const handleLogout = () => {
+        setUser(null);
+        localStorage.removeItem('os_virtlab_user_v1');
+      };
+
+      const [progress, setProgress] = useState(() => {
+        const saved = localStorage.getItem('os_virtlab_prog_v6');
+        if (saved) {
+          try { return JSON.parse(saved); } catch (e) {}
+        }
+        const init = {};
+        MODULES_DATA.forEach(m => {
+          init[m.id] = { learn: false, animation: false, task: false, terminal: false, quiz: false, completed: false, quizScore: 0 };
+        });
+        return init;
+      });
+
+      useEffect(() => {
+        localStorage.setItem('os_virtlab_prog_v6', JSON.stringify(progress));
+      }, [progress]);
+
+      useEffect(() => {
+        if (window.lucide) window.lucide.createIcons();
+      });
+
+      const showNotification = (msg, type = 'success') => {
+        setToast({ message: msg, type });
+        setTimeout(() => setToast(null), 3500);
+      };
+
+      const markStepComplete = (modId, stepName) => {
+        setProgress(prev => {
+          const mod = prev[modId] || { learn: false, animation: false, task: false, terminal: false, quiz: false, completed: false, quizScore: 0 };
+          const updated = { ...mod, [stepName]: true };
+          updated.completed = updated.learn && updated.animation && updated.task && updated.terminal && updated.quiz;
+          const nextProg = { ...prev, [modId]: updated };
+
+          const doneCount = Object.values(nextProg).filter(m => m.completed).length;
+          if (doneCount >= 10 && !showGraduation) {
+            setShowGraduation(true);
+            try { confetti({ particleCount: 150, spread: 100, origin: { y: 0.5 } }); } catch (e) {}
+          }
+
+          return nextProg;
+        });
+
+        const activeMod = MODULES_DATA.find(m => m.id === modId);
+        showNotification(`⚡ Progress Updated: ${activeMod ? activeMod.title : 'Module'} ${stepName.toUpperCase()} Verified!`);
+      };
+
+      const setQuizScore = (modId, score) => {
+        setProgress(prev => {
+          const mod = prev[modId] || {};
+          const updated = { ...mod, quiz: true, quizScore: score };
+          updated.completed = updated.learn && updated.animation && updated.task && updated.terminal && updated.quiz;
+          const nextProg = { ...prev, [modId]: updated };
+
+          const doneCount = Object.values(nextProg).filter(m => m.completed).length;
+          if (doneCount >= 10) setShowGraduation(true);
+          return nextProg;
+        });
+        showNotification(`🎉 Quiz Submitted & Verified! Score: ${score}%`);
+      };
+
+      const getModulePercent = (modId) => {
+        const m = progress[modId];
+        if (!m) return 0;
+        const done = [m.learn, m.animation, m.task, m.terminal, m.quiz].filter(Boolean).length;
+        return Math.round((done / 5) * 100);
+      };
+
+      const getOverallPercent = () => {
+        const sum = MODULES_DATA.reduce((acc, m) => acc + getModulePercent(m.id), 0);
+        return Math.round(sum / MODULES_DATA.length);
+      };
+
+      const handleStepDoneWithPopup = (modId, stepName, stepNum) => {
+        markStepComplete(modId, stepName);
+        setTaskModal({
+          stepName: stepName.toUpperCase(),
+          onNext: () => {
+            setTaskModal(null);
+            if (stepNum < 6) setCurrentStep(stepNum + 1);
+          }
+        });
+      };
+
+      const activeModule = MODULES_DATA.find(m => m.id === currentModuleId);
+
+      // Render Login Screen if not logged in
+      if (!user) {
+        return <LoginView onLogin={handleLogin} />;
+      }
+
+      return (
+        <div className="min-h-screen flex flex-col bg-[#fdf6e2] relative">
+          {/* Top Header */}
+          <header className="h-16 border-b-2 border-[#701a75] bg-white sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6 shadow-sm">
+            <div className="flex items-center gap-3">
+              <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 text-[#701a75] hover:bg-[#f3e8ff] rounded-xl md:hidden">
+                <i data-lucide="menu" className="w-5 h-5"></i>
+              </button>
+              <div onClick={() => setCurrentModuleId(null)} className="flex items-center gap-2.5 cursor-pointer group">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#701a75] to-[#ec4899] flex items-center justify-center text-white font-bold shadow-md group-hover:scale-105 transition">
+                  <i data-lucide="cpu" className="w-5 h-5"></i>
+                </div>
+                <div>
+                  <span className="font-black text-base tracking-tight text-[#701a75] flex items-center gap-2">
+                    OS Virtual Lab <span className="text-[10px] font-mono bg-[#f3e8ff] text-[#701a75] border border-[#701a75] px-2 py-0.5 rounded-full font-bold">v6.0</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="hidden lg:flex items-center gap-2 px-3 py-1 rounded-full bg-[#f3e8ff] border border-[#701a75] text-[#701a75] text-xs font-black">
+                <span>👨‍🎓 {user.name} ({user.rollNo})</span>
+                <button onClick={handleLogout} className="text-[10px] bg-[#701a75] text-white px-2 py-0.5 rounded-full hover:bg-red-600 transition ml-1">
+                  Logout
+                </button>
+              </div>
+
+              <button
+                onClick={() => setShowBadgeModal(true)}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#f3e8ff] border-2 border-[#701a75] text-[#701a75] text-xs font-black hover:scale-105 transition shadow-sm"
+              >
+                🏆 Badges
+              </button>
+
+              <div className="hidden sm:flex items-center gap-3 bg-[#fdf6e2] border-2 border-[#78350f]/20 px-4 py-1.5 rounded-full text-xs font-mono">
+                <span className="text-[#78350f] font-extrabold">Overall Progress: <strong className="text-[#701a75]">{getOverallPercent()}%</strong></span>
+                <div className="w-24 bg-white border border-[#78350f]/20 h-2.5 rounded-full overflow-hidden">
+                  <div className="bg-gradient-to-r from-[#f59e0b] via-[#ec4899] to-[#7e22ce] h-full transition-all duration-500" style={{ width: `${getOverallPercent()}%` }}></div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  if (getOverallPercent() >= 100) {
+                    setShowGraduation(true);
+                  } else {
+                    showNotification(`🔒 Certificate Locked! You must complete all 10 modules (100% course progress) to generate your certificate. Current progress: ${getOverallPercent()}%`, 'error');
+                  }
+                }}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black shadow-md transition ${
+                  getOverallPercent() >= 100
+                    ? 'bg-gradient-to-r from-[#f59e0b] to-[#ec4899] text-white hover:scale-105 cursor-pointer'
+                    : 'bg-gray-200 text-gray-500 border border-gray-300 opacity-70 cursor-not-allowed'
+                }`}
+              >
+                {getOverallPercent() >= 100 ? '🎓 Certificate' : '🔒 Certificate (Locked)'}
+              </button>
+            </div>
+          </header>
+
+          <div className="flex-1 flex max-w-7xl w-full mx-auto">
+            {/* Sidebar Navigation */}
+            <aside className={`fixed md:sticky top-16 h-[calc(100vh-4rem)] w-72 bg-white border-r-2 border-[#701a75] flex flex-col z-40 transition-transform ${
+              sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+            }`}>
+              <div className="p-4 flex-1 overflow-y-auto space-y-3">
+                <button
+                  onClick={() => { setCurrentModuleId(null); setSidebarOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black transition border-2 ${
+                    currentModuleId === null ? 'bg-[#701a75] text-white border-[#701a75] shadow-md' : 'text-[#701a75] border-transparent hover:bg-[#f3e8ff]'
+                  }`}
+                >
+                  <i data-lucide="layout-dashboard" className="w-4 h-4"></i> Main Dashboard
+                </button>
+
+                <div className="pt-2">
+                  <div className="text-[11px] font-mono uppercase text-[#78350f] font-black px-3 mb-2 tracking-wider">10 OS Modules</div>
+                  <div className="space-y-1.5">
+                    {MODULES_DATA.map(m => {
+                      const pct = getModulePercent(m.id);
+                      const isDone = progress[m.id]?.completed;
+                      const isActive = currentModuleId === m.id;
+
+                      return (
+                        <button
+                          key={m.id}
+                          onClick={() => { setCurrentModuleId(m.id); setCurrentStep(1); setSidebarOpen(false); }}
+                          className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-extrabold transition-all duration-300 hover:shadow-lg hover:scale-[1.02] border-2 ${
+                            isActive ? 'bg-[#f3e8ff] border-[#701a75] text-[#701a75]' : 'text-[#3b0764] border-transparent hover:bg-[#fdf6e2]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 truncate">
+                            <i data-lucide={m.icon} className="w-4 h-4 shrink-0 text-[#701a75]"></i>
+                            <span className="truncate">{m.title}</span>
+                          </div>
+                          <span className={`font-mono text-[10px] px-2 py-0.5 rounded-full font-black ${isDone ? 'bg-[#059669]/10 text-[#059669] border border-[#059669]' : 'bg-[#fdf6e2] text-[#78350f]'}`}>
+                            {isDone ? '✓' : `${pct}%`}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </aside>
+
+            {/* Main Content Area */}
+            <main className="flex-1 p-4 sm:p-8">
+              {currentModuleId === null ? (
+                <DashboardView
+                  modules={MODULES_DATA}
+                  progress={progress}
+                  getModulePercent={getModulePercent}
+                  getOverallPercent={getOverallPercent}
+                  onSelectModule={(id) => { setCurrentModuleId(id); setCurrentStep(1); }}
+                  onOpenBadges={() => setShowBadgeModal(true)}
+                />
+              ) : (
+                <TopicPageView
+                  moduleData={activeModule}
+                  currentStep={currentStep}
+                  setCurrentStep={setCurrentStep}
+                  progress={progress}
+                  getModulePercent={getModulePercent}
+                  markStepComplete={markStepComplete}
+                  handleStepDoneWithPopup={handleStepDoneWithPopup}
+                  setQuizScore={setQuizScore}
+                  onBackToDashboard={() => setCurrentModuleId(null)}
+                  showNotification={showNotification}
+                />
+              )}
+            </main>
+          </div>
+
+          {/* Persistent Floating Corner Badge Button */}
+          <button
+            onClick={() => setShowBadgeModal(true)}
+            className="fixed bottom-5 right-5 z-40 px-4 py-3 bg-gradient-to-r from-[#701a75] to-[#ec4899] text-white font-black text-xs rounded-full shadow-2xl hover:scale-110 transition flex items-center gap-2 border-2 border-white animate-float"
+          >
+            <span>🏆 View Badges</span>
+          </button>
+
+          {/* Floating Toast Notification */}
+          {toast && (
+            <div className="fixed top-20 right-6 z-50 animate-slide-up">
+              <div className={`px-5 py-3.5 rounded-2xl shadow-2xl border-2 font-black text-xs flex items-center gap-3 ${
+                toast.type === 'error' ? 'bg-[#ef4444] text-white border-red-700' : 'bg-[#701a75] text-white border-purple-900'
+              }`}>
+                <span>{toast.message}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Task Completed Animated Popup Modal */}
+          {taskModal && (
+            <div className="fixed inset-0 bg-[#3b0764]/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white border-4 border-[#f59e0b] p-8 rounded-3xl max-w-md w-full text-center space-y-5 shadow-2xl animate-slide-up">
+                <div className="w-16 h-16 bg-gradient-to-tr from-[#f59e0b] to-[#ec4899] rounded-full mx-auto flex items-center justify-center text-3xl shadow-lg">
+                  🎉
+                </div>
+                <div>
+                  <div className="text-xs font-black text-[#701a75] uppercase tracking-wider">Step Completed</div>
+                  <h2 className="text-2xl font-black text-[#3b0764] mt-1">🎉 Task Completed!</h2>
+                  <p className="text-xs text-[#78350f] font-extrabold mt-2">
+                    Great job! You have successfully completed the <strong>{taskModal.stepName}</strong> section.
+                  </p>
+                </div>
+                <button
+                  onClick={taskModal.onNext}
+                  className="w-full py-3.5 bg-gradient-to-r from-[#701a75] to-[#7e22ce] text-white font-black text-sm rounded-2xl shadow-lg hover:scale-105 transition"
+                >
+                  Next Task ➔
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Badges Modal */}
+          {showBadgeModal && (
+            <div className="fixed inset-0 bg-[#3b0764]/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
+              <div className="bg-white border-4 border-[#701a75] p-6 sm:p-8 rounded-3xl max-w-xl w-full space-y-6 shadow-2xl relative">
+                <button onClick={() => setShowBadgeModal(false)} className="absolute top-4 right-4 text-[#701a75] font-black text-xl hover:scale-110">✕</button>
+                <div className="text-center">
+                  <div className="text-4xl">🏆</div>
+                  <h2 className="text-2xl font-black text-[#3b0764] mt-1">OS Lab Achievements & Badges</h2>
+                  <p className="text-xs text-[#78350f] font-bold mt-1">Track your verified virtual lab credentials</p>
+                </div>
+
+                <div className="space-y-3">
+                  {ACHIEVEMENTS.map(ach => {
+                    const overall = getOverallPercent();
+                    let unlocked = false;
+                    if (ach.id === 'first_step' && overall > 0) unlocked = true;
+                    if (ach.id === 'scholar' && overall >= 50) unlocked = true;
+                    if (ach.id === 'master' && overall >= 100) unlocked = true;
+
+                    return (
+                      <div key={ach.id} className={`p-4 rounded-2xl border-2 flex items-center gap-4 transition ${
+                        unlocked ? 'bg-[#f3e8ff] border-[#701a75] text-[#701a75]' : 'bg-[#fdf6e2] border-[#78350f]/20 text-[#78350f] opacity-60'
+                      }`}>
+                        <div className="text-3xl">{unlocked ? '🏅' : '🔒'}</div>
+                        <div>
+                          <div className="font-black text-sm">{ach.title}</div>
+                          <div className="text-xs font-medium mt-0.5">{ach.desc}</div>
+                          <div className="text-[10px] font-mono font-bold mt-1">{unlocked ? 'STATUS: UNLOCKED ✓' : 'STATUS: LOCKED'}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <button onClick={() => setShowBadgeModal(false)} className="w-full py-3 bg-[#701a75] text-white font-black text-xs rounded-xl shadow-md">
+                  Close Badges Window
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Colorful Printable Certificate Modal with Entered Student Name */}
+          {showGraduation && (
+            <div className="fixed inset-0 bg-[#3b0764]/80 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
+              <div className="bg-white border-4 border-[#701a75] p-6 sm:p-10 rounded-3xl max-w-3xl w-full text-center space-y-6 shadow-2xl relative my-auto">
+                <button onClick={() => setShowGraduation(false)} className="absolute top-4 right-4 text-[#701a75] font-black text-xl hover:scale-110">✕</button>
+
+                <div className="space-y-2">
+                  <div className="text-xs font-mono font-black text-[#701a75] uppercase tracking-widest">OFFICIAL GRADUATION CERTIFICATE</div>
+                  <h1 className="text-3xl sm:text-4xl font-black text-[#3b0764]">🎉 Congratulations!</h1>
+                  <p className="text-xs text-[#78350f] font-bold">Enter your name below to personalize your official certificate:</p>
+                  
+                  <div className="max-w-md mx-auto pt-2">
+                    <input
+                      type="text"
+                      value={studentName}
+                      onChange={e => setStudentName(e.target.value)}
+                      placeholder="Enter Full Student Name..."
+                      className="w-full bg-[#fdf6e2] border-2 border-[#701a75] px-4 py-2.5 rounded-2xl text-center font-black text-base text-[#701a75] outline-none shadow-sm focus:ring-2 focus:ring-[#ec4899]"
+                    />
+                  </div>
+                </div>
+
+                {/* Printable Digital Certificate Design */}
+                <div id="certificate-print-area" className="bg-gradient-to-r from-[#fdf6e2] via-white to-[#f3e8ff] border-4 border-[#701a75] p-8 rounded-3xl space-y-4 text-center shadow-pop relative overflow-hidden">
+                  <div className="flex justify-between items-center border-b-2 border-[#701a75]/30 pb-4">
+                    <div className="text-left font-mono text-[10px] text-[#701a75] font-black">
+                      VERIFIED OS VIRTUAL LAB CREDENTIAL<br />
+                      DATE: {new Date().toLocaleDateString()}
+                    </div>
+                    <div className="text-3xl">🏆</div>
+                    <div className="text-right font-mono text-[10px] text-[#701a75] font-black">
+                      CERTIFICATE ID: OSV-2026-991A<br />
+                      STATUS: 100% COMPETENCY
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 py-4">
+                    <div className="text-xs font-mono uppercase tracking-widest text-[#78350f] font-black">THIS IS OFFICIALLY AWARDED TO</div>
+                    <h2 className="text-3xl sm:text-4xl font-black text-[#701a75] uppercase tracking-wide border-b-2 border-[#ec4899] inline-block pb-1 px-4">
+                      {studentName || 'STUDENT NAME'}
+                    </h2>
+                    <p className="text-xs text-[#78350f] font-bold max-w-lg mx-auto mt-3">
+                      For demonstrating complete mastery and successfully finishing all 10 visual interactive modules of the Operating Systems Virtual Laboratory.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 justify-center pt-2 border-t border-[#701a75]/20">
+                    {['Process Management', 'CPU Scheduling', 'Threads & Concurrency', 'Process Sync', 'Deadlocks', 'Memory Management', 'Paging MMU', 'Page Replacement', 'Disk Scheduling', 'File Systems'].map((tag, i) => (
+                      <span key={i} className="text-[9px] bg-white border border-[#701a75] text-[#701a75] px-2 py-0.5 rounded-full font-black">✓ {tag}</span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-4">
+                  <button onClick={() => window.print()} className="flex-1 py-3.5 bg-gradient-to-r from-[#f59e0b] to-[#ec4899] text-white font-black text-xs rounded-2xl shadow-md hover:scale-105 transition">
+                    🖨 Print Official Certificate
+                  </button>
+                  <button onClick={() => setShowGraduation(false)} className="flex-1 py-3.5 bg-[#701a75] text-white font-black text-xs rounded-2xl shadow-md hover:scale-105 transition">
+                    Close Window
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // DASHBOARD VIEW
+    // -------------------------------------------------------------
+    function DashboardView({ modules, progress, getModulePercent, getOverallPercent, onSelectModule, onOpenBadges }) {
+      const overall = getOverallPercent();
+      const completedCount = modules.filter(m => progress[m.id]?.completed).length;
+
+      return (
+        <div className="space-y-8 pb-12 animate-slide-up">
+          {/* Hero Banner */}
+          <div className="rounded-3xl bg-white border-4 border-[#701a75] p-6 sm:p-8 space-y-4 shadow-pop relative overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#f3e8ff] border border-[#701a75] text-[#701a75] text-xs font-mono font-black">
+                ✨ Interactive Educational Virtual Lab
+              </span>
+              <button onClick={onOpenBadges} className="px-3.5 py-1 rounded-full bg-[#fdf6e2] border-2 border-[#701a75] text-[#701a75] font-black text-xs hover:scale-105 transition">
+                🏆 Badges Overview
+              </button>
+            </div>
+
+            <h1 className="text-2xl sm:text-4xl font-black text-[#3b0764] tracking-tight">
+              Operating Systems Virtual Lab
+            </h1>
+            <p className="text-[#78350f] text-sm max-w-2xl leading-relaxed font-bold">
+              Explore 10 interactive OS modules with step-by-step visual concept animations, hands-on custom student inputs, simulated CLI shell commands, and quiz assessments.
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
+              <div className="bg-[#fdf6e2] border-2 border-[#78350f]/20 p-3.5 rounded-2xl text-center shadow-sm">
+                <div className="text-xs text-[#78350f] font-mono font-black">Overall Progress</div>
+                <div className="text-2xl font-black text-[#701a75] font-mono mt-0.5">{overall}%</div>
+              </div>
+              <div className="bg-[#fdf6e2] border-2 border-[#78350f]/20 p-3.5 rounded-2xl text-center shadow-sm">
+                <div className="text-xs text-[#78350f] font-mono font-black">Completed Modules</div>
+                <div className="text-2xl font-black text-[#059669] font-mono mt-0.5">{completedCount} / 10</div>
+              </div>
+              <div className="bg-[#fdf6e2] border-2 border-[#78350f]/20 p-3.5 rounded-2xl text-center shadow-sm">
+                <div className="text-xs text-[#78350f] font-mono font-black">OS Topics</div>
+                <div className="text-2xl font-black text-[#f59e0b] font-mono mt-0.5">10 Modules</div>
+              </div>
+              <div className="bg-[#fdf6e2] border-2 border-[#78350f]/20 p-3.5 rounded-2xl text-center shadow-sm">
+                <div className="text-xs text-[#78350f] font-mono font-black">Interactive Demos</div>
+                <div className="text-2xl font-black text-[#ec4899] font-mono mt-0.5">Every Module</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Module Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {modules.map(mod => {
+              const pct = getModulePercent(mod.id);
+              const isDone = progress[mod.id]?.completed;
+              const quizScore = progress[mod.id]?.quizScore || 0;
+
+              return (
+                <div
+                  key={mod.id}
+                  onClick={() => onSelectModule(mod.id)}
+                  className="group cursor-pointer rounded-3xl bg-white border-3 border-[#701a75]/30 hover:border-[#701a75] p-6 transition-all duration-300 hover:-translate-y-2 hover:scale-[1.02] shadow-pop flex flex-col justify-between"
+                >
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className={`p-3.5 rounded-2xl ${mod.color} text-white shadow-md group-hover:scale-110 transition-transform`}>
+                        <i data-lucide={mod.icon} className="w-6 h-6"></i>
+                      </div>
+                      {isDone ? (
+                        <span className="px-3 py-1 rounded-full bg-[#059669]/10 border border-[#059669] text-[#059669] text-xs font-mono font-black">
+                          ✓ Completed
+                        </span>
+                      ) : (
+                        <span className="text-xs font-mono text-[#78350f] bg-[#fdf6e2] px-3 py-1 rounded-full border border-[#78350f]/20 font-black">
+                          {pct}% Done
+                        </span>
+                      )}
+                    </div>
+
+                    <div>
+                      <h3 className="text-lg font-black text-[#3b0764] group-hover:text-[#701a75] transition-colors">
+                        Module {mod.num}: {mod.title}
+                      </h3>
+                      <p className="text-[#78350f] text-xs mt-1.5 leading-relaxed font-bold line-clamp-2">
+                        {mod.shortDesc}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-6 space-y-3">
+                    <div className="w-full bg-[#fdf6e2] border border-[#78350f]/20 h-2.5 rounded-full overflow-hidden">
+                      <div className="bg-gradient-to-r from-[#f59e0b] via-[#ec4899] to-[#7e22ce] h-full transition-all duration-500" style={{ width: `${pct}%` }}></div>
+                    </div>
+                    <div className="flex items-center justify-between text-xs font-mono font-black">
+                      <span className="text-[#78350f]">{quizScore > 0 ? `Quiz: ${quizScore}%` : mod.category}</span>
+                      <span className="text-[#701a75] group-hover:translate-x-1 transition-transform">Open Module ➔</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // TOPIC PAGE VIEW (6-STEP FLOW WITH PREVIOUS/NEXT TASK NAVIGATION & LOCKS)
+    // -------------------------------------------------------------
+    function TopicPageView({ moduleData, currentStep, setCurrentStep, progress, getModulePercent, markStepComplete, handleStepDoneWithPopup, setQuizScore, onBackToDashboard, showNotification }) {
+      const pct = getModulePercent(moduleData.id);
+      const modProgress = progress[moduleData.id] || {};
+
+      const steps = [
+        { id: 1, name: 'learn', label: 'Step 1: Learn' },
+        { id: 2, name: 'animation', label: 'Step 2: Animation' },
+        { id: 3, name: 'task', label: 'Step 3: Task' },
+        { id: 4, name: 'terminal', label: 'Step 4: CLI Shell' },
+        { id: 5, name: 'quiz', label: 'Step 5: Quiz' },
+        { id: 6, name: 'completed', label: 'Step 6: Completed' }
+      ];
+
+      const handleStepClick = (targetStepId) => {
+        if (targetStepId === 1) {
+          setCurrentStep(1);
+          return;
+        }
+
+        const prevStepName = steps[targetStepId - 2]?.name;
+        if (modProgress[prevStepName] || targetStepId <= currentStep) {
+          setCurrentStep(targetStepId);
+        } else {
+          showNotification(`⚠️ Step Locked! Please complete Step ${targetStepId - 1} before skipping ahead.`, 'error');
+        }
+      };
+
+      const handleNextTask = () => {
+        if (currentStep >= 6) return;
+        const currentStepName = steps[currentStep - 1]?.name;
+        if (modProgress[currentStepName] || currentStep === 1) {
+          setCurrentStep(currentStep + 1);
+        } else {
+          showNotification(`⚠️ Step Locked! Please finish the current activity to advance.`, 'error');
+        }
+      };
+
+      const handlePrevTask = () => {
+        if (currentStep > 1) {
+          setCurrentStep(currentStep - 1);
+        }
+      };
+
+      return (
+        <div className="space-y-6 pb-12 animate-slide-up">
+          {/* Breadcrumb Header */}
+          <div className="flex items-center justify-between text-xs font-mono font-black">
+            <button onClick={onBackToDashboard} className="text-[#701a75] hover:underline flex items-center gap-2">
+              ← Back to Dashboard
+            </button>
+            <span className="text-[#701a75] bg-white border border-[#701a75] px-3 py-1 rounded-full">{pct}% Completed</span>
+          </div>
+
+          {/* Module Banner */}
+          <div className="bg-white border-3 border-[#701a75] p-6 rounded-3xl space-y-2 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-black text-[#3b0764]">Module {moduleData.num}: {moduleData.title}</h1>
+                <p className="text-[#78350f] text-xs mt-1 font-bold">{moduleData.shortDesc}</p>
+              </div>
+              {modProgress.completed && (
+                <span className="px-4 py-1.5 rounded-full bg-[#059669]/10 border border-[#059669] text-[#059669] text-xs font-mono font-black">
+                  ✓ Module Fully Completed
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* 6-Step Timeline Header */}
+          <div className="bg-white border-2 border-[#701a75] p-2 rounded-2xl overflow-x-auto shadow-sm">
+            <div className="flex items-center min-w-[650px] justify-between">
+              {steps.map(step => {
+                const isCurrent = currentStep === step.id;
+                const isDone = modProgress[step.name];
+                const prevDone = step.id === 1 || modProgress[steps[step.id - 2]?.name];
+
+                return (
+                  <button
+                    key={step.id}
+                    onClick={() => handleStepClick(step.id)}
+                    className={`flex-1 px-3 py-2.5 rounded-xl text-xs font-black transition text-center flex items-center justify-center gap-1.5 ${
+                      isCurrent
+                        ? 'bg-[#701a75] text-white shadow-md'
+                        : isDone
+                        ? 'text-[#059669] hover:bg-[#f3e8ff]'
+                        : prevDone
+                        ? 'text-[#78350f] hover:bg-[#fdf6e2]'
+                        : 'text-gray-400 cursor-not-allowed opacity-60'
+                    }`}
+                  >
+                    <span>{step.label}</span>
+                    {isDone ? '✓' : !prevDone ? '🔒' : ''}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Dynamic Step Content */}
+          <div className="min-h-[400px]">
+            {currentStep === 1 && <LearnStep moduleData={moduleData} onDone={() => handleStepDoneWithPopup(moduleData.id, 'learn', 1)} />}
+            {currentStep === 2 && <AnimationStep moduleId={moduleData.id} onDone={() => handleStepDoneWithPopup(moduleData.id, 'animation', 2)} />}
+            {currentStep === 3 && <TaskStep moduleData={moduleData} onDone={() => handleStepDoneWithPopup(moduleData.id, 'task', 3)} />}
+            {currentStep === 4 && <TerminalStep moduleId={moduleData.id} onDone={() => handleStepDoneWithPopup(moduleData.id, 'terminal', 4)} />}
+            {currentStep === 5 && <QuizStep moduleData={moduleData} setQuizScore={setQuizScore} onDone={() => handleStepDoneWithPopup(moduleData.id, 'quiz', 5)} />}
+            {currentStep === 6 && <CompletedStep moduleData={moduleData} onDashboard={onBackToDashboard} />}
+          </div>
+
+          {/* Previous & Next Task Navigation Bar */}
+          <div className="bg-white border-2 border-[#701a75] p-3 rounded-2xl flex items-center justify-between shadow-sm font-mono text-xs">
+            <button
+              onClick={handlePrevTask}
+              disabled={currentStep <= 1}
+              className="px-4 py-2.5 rounded-xl bg-[#fdf6e2] border-2 border-[#78350f]/20 text-[#78350f] font-black hover:bg-[#f3e8ff] disabled:opacity-40 transition"
+            >
+              ← Previous Step
+            </button>
+            <span className="font-black text-[#701a75]">
+              Step {currentStep} of 6
+            </span>
+            <button
+              onClick={handleNextTask}
+              disabled={currentStep >= 6}
+              className="px-4 py-2.5 rounded-xl bg-[#701a75] text-white font-black hover:scale-105 disabled:opacity-40 transition shadow-sm"
+            >
+              Next Step ➔
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // STEP 1: LEARN (WITH INTERACTIVE INPUT EXAMPLE IN EVERY MODULE)
+    // -------------------------------------------------------------
+    function LearnStep({ moduleData, onDone }) {
+      const { learn } = moduleData;
+      return (
+        <div className="space-y-6">
+          <div className="bg-white border-2 border-[#701a75] p-6 rounded-2xl space-y-3 shadow-sm">
+            <h3 className="text-base font-black text-[#701a75] flex items-center gap-2">
+              <i data-lucide="book-open" className="w-5 h-5 text-[#701a75]"></i> Theoretical Overview
+            </h3>
+            <p className="text-[#3b0764] text-sm leading-relaxed font-bold">{learn.overview}</p>
+          </div>
+
+          {/* Interactive Example Try-It Panel in Every Module */}
+          <InteractiveExamplePanel moduleId={moduleData.id} />
+
+          {learn.analogy && (
+            <div className="bg-[#fef3c7] border-2 border-[#f59e0b] p-5 rounded-2xl flex items-start gap-4 shadow-sm">
+              <div className="p-2 bg-white rounded-xl text-[#f59e0b] shrink-0 border border-[#f59e0b]">
+                <i data-lucide="lightbulb" className="w-5 h-5"></i>
+              </div>
+              <div>
+                <h4 className="font-black text-[#78350f] text-sm">Real-World Analogy</h4>
+                <p className="text-[#78350f] text-xs leading-relaxed mt-1 font-bold">{learn.analogy}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <h4 className="text-sm font-black text-[#701a75] font-mono">Key Technical Terms</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {learn.keyTerms.map((item, idx) => (
+                <div key={idx} className="bg-white border-2 border-[#78350f]/20 p-4 rounded-xl space-y-1">
+                  <div className="font-mono font-black text-xs text-[#701a75]">{item.term}</div>
+                  <p className="text-[#78350f] text-xs font-bold">{item.definition}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button onClick={onDone} className="w-full py-4 bg-gradient-to-r from-[#701a75] to-[#7e22ce] text-white font-black text-sm rounded-xl shadow-md hover:scale-[1.01] transition">
+            ✓ Complete Learn Material & Next Task ➔
+          </button>
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // INTERACTIVE EXAMPLE PANEL FOR EVERY MODULE
+    // -------------------------------------------------------------
+    function InteractiveExamplePanel({ moduleId }) {
+      return (
+        <div className="bg-white border-3 border-[#701a75] p-5 rounded-2xl space-y-4 shadow-sm">
+          <div className="flex items-center justify-between border-b border-[#701a75]/20 pb-2">
+            <span className="font-black text-sm text-[#701a75] flex items-center gap-2">
+              ⚡ Live Interactive Example (Try Custom Inputs)
+            </span>
+            <span className="text-[10px] font-mono bg-[#f3e8ff] text-[#701a75] border border-[#701a75] px-2 py-0.5 rounded-full font-black">
+              Hands-On Simulator
+            </span>
+          </div>
+
+          {moduleId === 'process-management' && <ProcessExample />}
+          {moduleId === 'cpu-scheduling' && <CpuExample />}
+          {moduleId === 'threads' && <ThreadExample />}
+          {moduleId === 'process-sync' && <SyncExample />}
+          {moduleId === 'deadlocks' && <DeadlockExample />}
+          {moduleId === 'memory-management' && <MemoryExample />}
+          {moduleId === 'paging' && <PagingExample />}
+          {moduleId === 'page-replacement' && <PageReplaceExample />}
+          {moduleId === 'disk-scheduling' && <DiskExample />}
+          {moduleId === 'file-systems' && <FileSystemExample />}
+        </div>
+      );
+    }
+
+    function ProcessExample() {
+      const [pname, setPname] = useState('P1');
+      const [pstate, setPstate] = useState('Running');
+      const [priority, setPriority] = useState('High');
+
+      return (
+        <div className="space-y-3 font-mono text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="text-[#78350f] font-black">Process Name:</label>
+              <input type="text" value={pname} onChange={e => setPname(e.target.value)} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1.5 rounded-xl font-black text-[#701a75] mt-1" />
+            </div>
+            <div>
+              <label className="text-[#78350f] font-black">Process State:</label>
+              <select value={pstate} onChange={e => setPstate(e.target.value)} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1.5 rounded-xl font-black text-[#701a75] mt-1">
+                <option value="New">New</option>
+                <option value="Ready">Ready</option>
+                <option value="Running">Running</option>
+                <option value="Waiting">Waiting</option>
+                <option value="Terminated">Terminated</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[#78350f] font-black">Priority:</label>
+              <select value={priority} onChange={e => setPriority(e.target.value)} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1.5 rounded-xl font-black text-[#701a75] mt-1">
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="bg-[#f3e8ff] border-2 border-[#701a75] p-4 rounded-xl space-y-1 text-[#701a75]">
+            <div className="font-black">Generated PCB Structure:</div>
+            <div>PID: 1042 | Name: {pname}</div>
+            <div>State: {pstate} | Priority: {priority}</div>
+            <div>Memory Address: 0x7FFF8A40</div>
+          </div>
+        </div>
+      );
+    }
+
+    function CpuExample() {
+      const [b1, setB1] = useState(6);
+      const [b2, setB2] = useState(4);
+      const [b3, setB3] = useState(8);
+
+      const total = Number(b1) + Number(b2) + Number(b3);
+      const avgWt = ((0 + Number(b1) + (Number(b1) + Number(b2))) / 3).toFixed(2);
+
+      return (
+        <div className="space-y-3 font-mono text-xs">
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="text-[#78350f] font-black">P1 Burst (ms):</label>
+              <input type="number" min="1" value={b1} onChange={e => setB1(e.target.value)} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1.5 rounded-xl font-black text-[#701a75] mt-1" />
+            </div>
+            <div>
+              <label className="text-[#78350f] font-black">P2 Burst (ms):</label>
+              <input type="number" min="1" value={b2} onChange={e => setB2(e.target.value)} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1.5 rounded-xl font-black text-[#701a75] mt-1" />
+            </div>
+            <div>
+              <label className="text-[#78350f] font-black">P3 Burst (ms):</label>
+              <input type="number" min="1" value={b3} onChange={e => setB3(e.target.value)} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1.5 rounded-xl font-black text-[#701a75] mt-1" />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <div className="text-[#78350f] font-black">Live FCFS Gantt Chart:</div>
+            <div className="flex h-10 border-2 border-[#701a75] rounded-xl overflow-hidden text-center text-white font-black text-[11px]">
+              <div style={{ width: `${(b1/total)*100}%` }} className="bg-[#701a75] border-r border-white flex items-center justify-center">P1 ({b1}ms)</div>
+              <div style={{ width: `${(b2/total)*100}%` }} className="bg-[#ec4899] border-r border-white flex items-center justify-center">P2 ({b2}ms)</div>
+              <div style={{ width: `${(b3/total)*100}%` }} className="bg-[#7e22ce] flex items-center justify-center">P3 ({b3}ms)</div>
+            </div>
+            <div className="text-[#059669] font-black pt-1">Computed Avg Waiting Time = {avgWt} ms</div>
+          </div>
+        </div>
+      );
+    }
+
+    function ThreadExample() {
+      const [count, setCount] = useState(2);
+      const [counter, setCounter] = useState(0);
+
+      return (
+        <div className="space-y-3 font-mono text-xs">
+          <div className="flex items-center gap-4">
+            <label className="text-[#78350f] font-black">Active Threads:</label>
+            <input type="range" min="1" max="8" value={count} onChange={e => setCount(e.target.value)} className="accent-[#701a75]" />
+            <span className="font-black text-[#701a75]">{count} Threads</span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button onClick={() => setCounter(counter + Number(count) * 10)} className="px-4 py-2 bg-[#701a75] text-white font-black rounded-xl hover:scale-105 transition">
+              Spawn Worker Threads & Increment
+            </button>
+            <button onClick={() => setCounter(0)} className="px-3 py-2 bg-[#fdf6e2] text-[#78350f] border border-[#78350f] font-black rounded-xl">
+              Reset
+            </button>
+          </div>
+          <div className="text-sm text-[#701a75] font-black">Shared Variable Counter Value = {counter}</div>
+        </div>
+      );
+    }
+
+    function SyncExample() {
+      const [cap, setCap] = useState(4);
+      const [items, setItems] = useState(['Slot A']);
+
+      return (
+        <div className="space-y-3 font-mono text-xs">
+          <div className="flex items-center justify-between">
+            <label className="text-[#78350f] font-black">Buffer Capacity: {cap}</label>
+            <div className="flex gap-2">
+              <button onClick={() => items.length < cap && setItems([...items, `Slot ${String.fromCharCode(65 + items.length)}`])} className="px-3 py-1.5 bg-[#701a75] text-white font-black rounded-xl">
+                + Produce
+              </button>
+              <button onClick={() => items.length > 0 && setItems(items.slice(0, -1))} className="px-3 py-1.5 bg-[#ec4899] text-white font-black rounded-xl">
+                - Consume
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-4 gap-2">
+            {Array.from({ length: cap }).map((_, idx) => (
+              <div key={idx} className={`h-12 rounded-xl border-2 flex items-center justify-center font-black ${items[idx] ? 'bg-[#f3e8ff] border-[#701a75] text-[#701a75]' : 'bg-[#fdf6e2] border-[#78350f]/20 text-[#78350f]'}`}>
+                {items[idx] || 'Empty'}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function DeadlockExample() {
+      const [alloc, setAlloc] = useState(2);
+      const [max, setMax] = useState(4);
+      const need = max - alloc;
+      const isSafe = need <= 3;
+
+      return (
+        <div className="space-y-3 font-mono text-xs">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[#78350f] font-black">P1 Allocated R1:</label>
+              <input type="number" value={alloc} onChange={e => setAlloc(Number(e.target.value))} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1.5 rounded-xl font-black text-[#701a75]" />
+            </div>
+            <div>
+              <label className="text-[#78350f] font-black">P1 Max Demand R1:</label>
+              <input type="number" value={max} onChange={e => setMax(Number(e.target.value))} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1.5 rounded-xl font-black text-[#701a75]" />
+            </div>
+          </div>
+
+          <div className={`p-3 rounded-xl border-2 font-black ${isSafe ? 'bg-[#059669]/10 border-[#059669] text-[#059669]' : 'bg-[#ef4444]/10 border-[#ef4444] text-[#ef4444]'}`}>
+            Calculated Need = {need} | {isSafe ? 'STATE SAFE: Process claims can be satisfied' : 'UNSAFE STATE: Potential Circular Wait Risk!'}
+          </div>
+        </div>
+      );
+    }
+
+    function MemoryExample() {
+      const [req, setReq] = useState(212);
+      const [strat, setStrat] = useState('Best-Fit');
+
+      return (
+        <div className="space-y-3 font-mono text-xs">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[#78350f] font-black">Memory Request (KB):</label>
+              <input type="number" value={req} onChange={e => setReq(Number(e.target.value))} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1.5 rounded-xl font-black text-[#701a75]" />
+            </div>
+            <div>
+              <label className="text-[#78350f] font-black">Allocation Strategy:</label>
+              <select value={strat} onChange={e => setStrat(e.target.value)} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1.5 rounded-xl font-black text-[#701a75]">
+                <option value="First-Fit">First-Fit</option>
+                <option value="Best-Fit">Best-Fit</option>
+                <option value="Worst-Fit">Worst-Fit</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="bg-[#f3e8ff] border border-[#701a75] p-3 rounded-xl text-[#701a75] font-black">
+            Holes: [100KB, 500KB, 200KB, 300KB] ➔ Allocated to {strat === 'Best-Fit' ? '300KB Hole (Leftover 88KB)' : strat === 'First-Fit' ? '500KB Hole (Leftover 288KB)' : '500KB Hole (Largest)'}
+          </div>
+        </div>
+      );
+    }
+
+    function PagingExample() {
+      const [addr, setAddr] = useState(2448);
+      const page = Math.floor(addr / 1024);
+      const offset = addr % 1024;
+      const frame = page + 3;
+      const phys = (frame * 1024) + offset;
+
+      return (
+        <div className="space-y-3 font-mono text-xs">
+          <div>
+            <label className="text-[#78350f] font-black">Logical Address (bytes):</label>
+            <input type="number" value={addr} onChange={e => setAddr(Number(e.target.value))} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1.5 rounded-xl font-black text-[#701a75] mt-1" />
+          </div>
+
+          <div className="bg-[#f3e8ff] border border-[#701a75] p-3 rounded-xl text-[#701a75] font-black">
+            Page Number (p) = {page} | Offset (d) = {offset} ➔ Mapped Frame = {frame} ➔ Physical Address = {phys} bytes
+          </div>
+        </div>
+      );
+    }
+
+    function PageReplaceExample() {
+      const [pages, setPages] = useState('7, 0, 1, 2, 0, 3');
+
+      return (
+        <div className="space-y-3 font-mono text-xs">
+          <div>
+            <label className="text-[#78350f] font-black">Page Reference String:</label>
+            <input type="text" value={pages} onChange={e => setPages(e.target.value)} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1.5 rounded-xl font-black text-[#701a75] mt-1" />
+          </div>
+
+          <div className="flex flex-wrap gap-2 text-center">
+            {pages.split(',').map((p, i) => (
+              <div key={i} className="bg-[#f3e8ff] border border-[#701a75] p-2 rounded-xl min-w-[40px]">
+                <div className="text-[#701a75] font-black">{p.trim()}</div>
+                <div className="text-[9px] text-[#ef4444] font-black mt-0.5">FAULT</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function DiskExample() {
+      const [head, setHead] = useState(50);
+
+      return (
+        <div className="space-y-3 font-mono text-xs">
+          <div>
+            <label className="text-[#78350f] font-black">Initial Head Position:</label>
+            <input type="number" value={head} onChange={e => setHead(Number(e.target.value))} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1.5 rounded-xl font-black text-[#701a75] mt-1" />
+          </div>
+
+          <div className="bg-[#f3e8ff] border border-[#701a75] p-3 rounded-xl text-[#701a75] font-black">
+            SSTF Track Trace: {head} ➔ 43 ➔ 82 ➔ 170 (Calculated Total Seek = {Math.abs(head - 43) + (82 - 43) + (170 - 82)} Cylinders)
+          </div>
+        </div>
+      );
+    }
+
+    function FileSystemExample() {
+      const [fname, setFname] = useState('report.pdf');
+
+      return (
+        <div className="space-y-3 font-mono text-xs">
+          <div>
+            <label className="text-[#78350f] font-black">File Name:</label>
+            <input type="text" value={fname} onChange={e => setFname(e.target.value)} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1.5 rounded-xl font-black text-[#701a75] mt-1" />
+          </div>
+
+          <div className="bg-[#f3e8ff] border border-[#701a75] p-3 rounded-xl text-[#701a75] font-black">
+            Inode Sector #12 ➔ Metadata [{fname} | 42KB] ➔ Index Block #5 Pointers [Sector 14, 18, 22]
+          </div>
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // STEP 2: ANIMATION STEP (IN-DEPTH INTERACTIVE CONCEPT SIMULATORS WITH SPEED & PLAYBACK CONTROLS)
+    // -------------------------------------------------------------
+    function AnimationStep({ moduleId, onDone }) {
+      return (
+        <div className="space-y-4 animate-slide-up">
+          <div className="bg-white border-2 border-[#701a75] p-4 rounded-xl text-xs text-[#78350f] font-mono flex flex-wrap items-center justify-between font-black shadow-sm gap-2">
+            <span className="flex items-center gap-2">
+              🎬 Step 2: Full Animated Simulation Sandbox
+            </span>
+            <span className="text-[#701a75] bg-[#f3e8ff] border border-[#701a75] px-2.5 py-1 rounded-full text-[10px]">
+              ▶ Play, Pause, Speed & Custom Student Inputs
+            </span>
+          </div>
+
+          {moduleId === 'process-management' && <ProcessSim />}
+          {moduleId === 'cpu-scheduling' && <CpuSim />}
+          {moduleId === 'threads' && <ThreadSim />}
+          {moduleId === 'process-sync' && <SyncSim />}
+          {moduleId === 'deadlocks' && <DeadlockSim />}
+          {moduleId === 'memory-management' && <MemorySim />}
+          {moduleId === 'paging' && <PagingSim />}
+          {moduleId === 'page-replacement' && <PageReplaceSim />}
+          {moduleId === 'disk-scheduling' && <DiskSim />}
+          {moduleId === 'file-systems' && <FileSystemSim />}
+
+          <button onClick={onDone} className="w-full py-4 bg-gradient-to-r from-[#701a75] to-[#7e22ce] text-white font-black text-sm rounded-xl shadow-md mt-4 hover:scale-[1.01] transition">
+            ✓ Complete Animation & Next Task ➔
+          </button>
+        </div>
+      );
+    }
+
+    // 1. Process Management Simulator
+    function ProcessSim() {
+      const [procs, setProcs] = useState([
+        { id: 'P1', state: 'Ready', priority: 'High', pid: 101 },
+        { id: 'P2', state: 'Running', priority: 'Medium', pid: 102 },
+        { id: 'P3', state: 'Waiting', priority: 'Low', pid: 103 }
+      ]);
+      const [newProcName, setNewProcName] = useState('P4');
+      const states = ['New', 'Ready', 'Running', 'Waiting', 'Terminated'];
+
+      const addProcess = () => {
+        if (!newProcName.trim()) return;
+        setProcs([...procs, { id: newProcName.trim(), state: 'New', priority: 'Medium', pid: 100 + procs.length + 1 }]);
+        setNewProcName(`P${procs.length + 2}`);
+      };
+
+      const moveState = (id, targetState) => {
+        setProcs(procs.map(p => p.id === id ? { ...p, state: targetState } : p));
+      };
+
+      return (
+        <div className="bg-white border-2 border-[#701a75] p-5 rounded-2xl space-y-5 font-mono text-xs shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fdf6e2] border-2 border-[#78350f]/20 p-3 rounded-xl">
+            <div className="flex items-center gap-2">
+              <span className="text-[#78350f] font-black">Add Process:</span>
+              <input type="text" value={newProcName} onChange={e => setNewProcName(e.target.value)} className="w-20 bg-white border border-[#701a75] px-2 py-1 rounded font-black text-[#701a75]" />
+              <button onClick={addProcess} className="px-3 py-1 bg-[#701a75] text-white font-black rounded-lg hover:scale-105 transition">+ Add</button>
+            </div>
+            <div className="text-[11px] text-[#78350f] font-bold">Tip: Click state action buttons below to transition processes</div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+            {states.map(s => {
+              const list = procs.filter(p => p.state === s);
+              return (
+                <div key={s} className="bg-white border-2 border-[#701a75]/30 p-3 rounded-2xl min-h-[220px] flex flex-col justify-between shadow-sm">
+                  <div>
+                    <div className="font-black text-xs text-[#701a75] border-b-2 border-[#701a75]/20 pb-2 mb-2 flex justify-between">
+                      <span>{s}</span>
+                      <span className="font-mono text-[#ec4899] bg-[#f3e8ff] px-2 py-0.5 rounded-full">{list.length}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {list.map(p => (
+                        <div key={p.id} className="bg-[#fdf6e2] p-2.5 rounded-xl border border-[#78350f]/20 font-black space-y-1.5 shadow-sm">
+                          <div className="flex justify-between text-[#3b0764]">
+                            <span>{p.id} (PID {p.pid})</span>
+                            <span className="text-[10px] text-[#701a75]">{p.priority}</span>
+                          </div>
+                          {s === 'New' && (
+                            <button onClick={() => moveState(p.id, 'Ready')} className="w-full py-1 bg-[#701a75] text-white text-[10px] font-black rounded">Admit to Ready ➔</button>
+                          )}
+                          {s === 'Ready' && (
+                            <button onClick={() => moveState(p.id, 'Running')} className="w-full py-1 bg-[#059669] text-white text-[10px] font-black rounded">Dispatch CPU ➔</button>
+                          )}
+                          {s === 'Running' && (
+                            <div className="space-y-1">
+                              <button onClick={() => moveState(p.id, 'Waiting')} className="w-full py-1 bg-[#f59e0b] text-white text-[10px] font-black rounded">I/O Request ➔</button>
+                              <button onClick={() => moveState(p.id, 'Terminated')} className="w-full py-1 bg-[#ef4444] text-white text-[10px] font-black rounded">Exit / Terminate ➔</button>
+                            </div>
+                          )}
+                          {s === 'Waiting' && (
+                            <button onClick={() => moveState(p.id, 'Ready')} className="w-full py-1 bg-[#701a75] text-white text-[10px] font-black rounded">I/O Done ➔ Ready</button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // 2. CPU Scheduling Simulator
+    function CpuSim() {
+      const [algo, setAlgo] = useState('FCFS');
+      const [tq, setTq] = useState(2);
+      const [speedMult, setSpeedMult] = useState(1);
+      const [procs, setProcs] = useState([
+        { id: 'P1', burst: 6, arrival: 0 },
+        { id: 'P2', burst: 4, arrival: 1 },
+        { id: 'P3', burst: 8, arrival: 2 }
+      ]);
+      const [step, setStep] = useState(0);
+      const [isPlaying, setIsPlaying] = useState(false);
+
+      useEffect(() => {
+        let timer;
+        const total = procs.reduce((acc, p) => acc + p.burst, 0);
+        if (isPlaying && step < total) {
+          timer = setTimeout(() => setStep(prev => prev + 1), 600 / speedMult);
+        } else if (step >= total) {
+          setIsPlaying(false);
+        }
+        return () => clearTimeout(timer);
+      }, [isPlaying, step, speedMult, procs]);
+
+      const totalBurst = procs.reduce((acc, p) => acc + p.burst, 0);
+
+      return (
+        <div className="bg-white border-2 border-[#701a75] p-5 rounded-2xl space-y-4 font-mono text-xs shadow-sm">
+          {/* Controls Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fdf6e2] border border-[#701a75]/30 p-3 rounded-xl">
+            <div className="flex items-center gap-3">
+              <span className="text-[#78350f] font-black">Algorithm:</span>
+              <select value={algo} onChange={e => { setAlgo(e.target.value); setStep(0); }} className="bg-white border border-[#701a75] text-[#701a75] p-1.5 rounded-xl font-black">
+                <option value="FCFS">FCFS (First-Come First-Served)</option>
+                <option value="SJF">SJF (Shortest Job First)</option>
+                <option value="RR">Round Robin (RR)</option>
+              </select>
+              {algo === 'RR' && (
+                <div className="flex items-center gap-1">
+                  <span className="text-[#78350f] font-black">Quantum (Q):</span>
+                  <input type="number" min="1" max="5" value={tq} onChange={e => setTq(Number(e.target.value))} className="w-12 bg-white border border-[#701a75] p-1 rounded font-black text-[#701a75]" />
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[#78350f] font-black">Speed:</span>
+              <select value={speedMult} onChange={e => setSpeedMult(Number(e.target.value))} className="bg-white border border-[#701a75] text-[#701a75] p-1 rounded font-black">
+                <option value={0.5}>0.5x</option>
+                <option value={1}>1.0x</option>
+                <option value={2}>2.0x</option>
+              </select>
+              <button onClick={() => setIsPlaying(!isPlaying)} className="px-3.5 py-1.5 bg-[#701a75] text-white font-black rounded-xl hover:scale-105 transition">
+                {isPlaying ? '⏸ Pause' : '▶ Play'}
+              </button>
+              <button onClick={() => setStep(prev => Math.min(prev + 1, totalBurst))} className="px-3 py-1.5 bg-[#ec4899] text-white font-black rounded-xl hover:scale-105 transition">
+                ⏭ Step
+              </button>
+              <button onClick={() => { setStep(0); setIsPlaying(false); }} className="px-3 py-1.5 bg-[#fdf6e2] border border-[#78350f] text-[#78350f] font-black rounded-xl">
+                ↺ Reset
+              </button>
+            </div>
+          </div>
+
+          {/* Custom Student Input Fields */}
+          <div className="grid grid-cols-3 gap-2 bg-white border border-[#701a75]/20 p-3 rounded-xl">
+            {procs.map((p, idx) => (
+              <div key={p.id} className="space-y-1">
+                <label className="text-[#701a75] font-black">{p.id} Burst (ms):</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={p.burst}
+                  onChange={e => {
+                    const next = [...procs];
+                    next[idx].burst = Math.max(1, Number(e.target.value));
+                    setProcs(next);
+                    setStep(0);
+                  }}
+                  className="w-full bg-[#fdf6e2] border border-[#701a75] p-1.5 rounded-xl font-black text-[#701a75]"
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Animated Gantt Timeline */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[#78350f] font-black">Animated CPU Gantt Progress (Time t = {step} ms):</span>
+              <span className="text-[#059669] font-black">Total Duration: {totalBurst} ms</span>
+            </div>
+            <div className="flex border-2 border-[#701a75] rounded-xl h-14 overflow-hidden text-center text-white font-black shadow-inner">
+              <div style={{ width: `${(procs[0].burst/totalBurst)*100}%` }} className={`border-r border-white flex flex-col items-center justify-center transition-all ${step >= procs[0].burst ? 'bg-[#701a75]' : 'bg-[#701a75]/40 opacity-70'}`}>
+                <span>{procs[0].id}</span>
+                <span className="text-[9px]">0 - {procs[0].burst}ms</span>
+              </div>
+              <div style={{ width: `${(procs[1].burst/totalBurst)*100}%` }} className={`border-r border-white flex flex-col items-center justify-center transition-all ${step >= procs[0].burst + procs[1].burst ? 'bg-[#ec4899]' : 'bg-[#ec4899]/40 opacity-70'}`}>
+                <span>{procs[1].id}</span>
+                <span className="text-[9px]">{procs[0].burst} - {procs[0].burst + procs[1].burst}ms</span>
+              </div>
+              <div style={{ width: `${(procs[2].burst/totalBurst)*100}%` }} className={`flex flex-col items-center justify-center transition-all ${step >= totalBurst ? 'bg-[#7e22ce]' : 'bg-[#7e22ce]/40 opacity-70'}`}>
+                <span>{procs[2].id}</span>
+                <span className="text-[9px]">{procs[0].burst + procs[1].burst} - {totalBurst}ms</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 3. Thread Simulator
+    function ThreadSim() {
+      const [threadCount, setThreadCount] = useState(3);
+      const [useLock, setUseLock] = useState(true);
+      const [counter, setCounter] = useState(0);
+      const [isRunning, setIsRunning] = useState(false);
+
+      const runSim = () => {
+        setIsRunning(true);
+        let val = 0;
+        const target = useLock ? threadCount * 10 : Math.floor(threadCount * 8.5);
+        const interval = setInterval(() => {
+          val += 1;
+          setCounter(val);
+          if (val >= target) {
+            clearInterval(interval);
+            setIsRunning(false);
+          }
+        }, 70);
+      };
+
+      return (
+        <div className="bg-white border-2 border-[#701a75] p-5 rounded-2xl space-y-4 text-xs font-mono shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fdf6e2] p-3 rounded-xl border border-[#701a75]/20">
+            <div className="flex items-center gap-3">
+              <span className="text-[#78350f] font-black">Threads:</span>
+              <input type="range" min="1" max="6" value={threadCount} onChange={e => setThreadCount(Number(e.target.value))} className="accent-[#701a75]" />
+              <span className="font-black text-[#701a75]">{threadCount} Threads</span>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer text-[#78350f] font-black">
+              <input type="checkbox" checked={useLock} onChange={e => setUseLock(e.target.checked)} className="accent-[#701a75]" />
+              Enable Mutex Lock
+            </label>
+            <button onClick={runSim} disabled={isRunning} className="px-4 py-2 bg-[#701a75] text-white font-black rounded-xl hover:scale-105 transition disabled:opacity-50">
+              {isRunning ? 'Executing...' : '▶ Run Execution'}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {Array.from({ length: threadCount }).map((_, i) => (
+              <div key={i} className={`p-3 rounded-xl border-2 font-black space-y-1 transition-all ${
+                isRunning ? 'bg-[#f3e8ff] border-[#701a75] animate-pulse' : 'bg-white border-[#701a75]/30'
+              }`}>
+                <div className="text-[#701a75]">Thread #{i + 1}</div>
+                <div className="text-[10px] text-[#78350f]">{useLock ? '✓ Mutex Acquired' : '⚠️ Unlocked Shared Access'}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className={`p-4 rounded-xl border-2 text-center text-sm font-black ${useLock ? 'bg-[#059669]/10 border-[#059669] text-[#059669]' : 'bg-[#ef4444]/10 border-[#ef4444] text-[#ef4444]'}`}>
+            Shared Counter Value = {counter} {useLock ? '(SYNC EXPLICIT: Target Met)' : '(RACE CONDITION CONFLICT)'}
+          </div>
+        </div>
+      );
+    }
+
+    // 4. Process Synchronization Simulator
+    function SyncSim() {
+      const [cap, setCap] = useState(5);
+      const [buffer, setBuffer] = useState(['Item A', 'Item B']);
+
+      const produce = () => {
+        if (buffer.length < cap) {
+          const char = String.fromCharCode(65 + buffer.length);
+          setBuffer([...buffer, `Item ${char}`]);
+        }
+      };
+
+      const consume = () => {
+        if (buffer.length > 0) {
+          setBuffer(buffer.slice(0, -1));
+        }
+      };
+
+      return (
+        <div className="bg-white border-2 border-[#701a75] p-5 rounded-2xl space-y-4 text-xs font-mono shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fdf6e2] p-3 rounded-xl border border-[#701a75]/20">
+            <div className="flex items-center gap-2">
+              <span className="text-[#78350f] font-black">Capacity:</span>
+              <input type="number" min="2" max="8" value={cap} onChange={e => setCap(Number(e.target.value))} className="w-14 bg-white border border-[#701a75] p-1 rounded font-black text-[#701a75]" />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={produce} disabled={buffer.length >= cap} className="px-3.5 py-1.5 bg-[#701a75] text-white font-black rounded-xl hover:scale-105 transition disabled:opacity-40">
+                + Produce Item
+              </button>
+              <button onClick={consume} disabled={buffer.length === 0} className="px-3.5 py-1.5 bg-[#ec4899] text-white font-black rounded-xl hover:scale-105 transition disabled:opacity-40">
+                - Consume Item
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-5 gap-3">
+            {Array.from({ length: cap }).map((_, idx) => (
+              <div key={idx} className={`h-16 rounded-2xl border-2 flex flex-col items-center justify-center font-black transition-all ${
+                buffer[idx] ? 'bg-[#f3e8ff] border-[#701a75] text-[#701a75] shadow-md scale-105' : 'bg-[#fdf6e2] border-[#78350f]/20 text-[#78350f]'
+              }`}>
+                <span>{buffer[idx] || 'Empty'}</span>
+                <span className="text-[9px] text-[#78350f]/70">Slot #{idx}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // 5. Deadlock Simulator
+    function DeadlockSim() {
+      const [algo, setAlgo] = useState('bankers');
+      const [alloc, setAlloc] = useState([2, 1, 1]);
+      const [max, setMax] = useState([4, 3, 3]);
+      const [avail, setAvail] = useState([3, 2, 2]);
+
+      const need = max.map((m, i) => Math.max(0, m - alloc[i]));
+      const isSafe = need.every((n, i) => n <= avail[i]);
+
+      return (
+        <div className="bg-white border-2 border-[#701a75] p-5 rounded-2xl space-y-4 text-xs font-mono shadow-sm">
+          {/* Algorithm Selector Header */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fdf6e2] p-3 rounded-xl border border-[#701a75]/20">
+            <div className="flex items-center gap-3">
+              <span className="text-[#78350f] font-black">Deadlock Algorithm:</span>
+              <select value={algo} onChange={e => setAlgo(e.target.value)} className="bg-white border border-[#701a75] text-[#701a75] p-1.5 rounded-xl font-black">
+                <option value="bankers">Banker's Safety Algorithm (Avoidance)</option>
+                <option value="rag">Resource Allocation Graph (RAG) Cycle Detection</option>
+                <option value="prevention">Deadlock Prevention (Coffman Breaking)</option>
+                <option value="waitfor">Wait-For Graph Dependency Analysis</option>
+              </select>
+            </div>
+            <span className="text-[10px] bg-[#f3e8ff] border border-[#701a75] text-[#701a75] px-2.5 py-1 rounded-full font-black">
+              {algo === 'bankers' ? 'Dynamic Matrix Check' : algo === 'rag' ? 'Directed Graph Cycle' : algo === 'prevention' ? 'Preemption Rules' : 'Wait Graph'}
+            </span>
+          </div>
+
+          {/* Dynamic Inputs */}
+          {algo === 'bankers' && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-3 bg-white border border-[#701a75]/20 p-3 rounded-xl text-center">
+                <div>
+                  <label className="text-[#701a75] font-black">P0 Allocation (R1,R2,R3):</label>
+                  <div className="flex gap-1 mt-1 justify-center">
+                    {alloc.map((v, i) => (
+                      <input key={i} type="number" min="0" value={v} onChange={e => {
+                        const next = [...alloc]; next[i] = Number(e.target.value); setAlloc(next);
+                      }} className="w-10 bg-[#fdf6e2] border border-[#701a75] p-1 rounded font-black text-center text-[#701a75]" />
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[#701a75] font-black">P0 Max Demand (R1,R2,R3):</label>
+                  <div className="flex gap-1 mt-1 justify-center">
+                    {max.map((v, i) => (
+                      <input key={i} type="number" min="0" value={v} onChange={e => {
+                        const next = [...max]; next[i] = Number(e.target.value); setMax(next);
+                      }} className="w-10 bg-[#fdf6e2] border border-[#701a75] p-1 rounded font-black text-center text-[#701a75]" />
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[#701a75] font-black">Available Vectors (R1,R2,R3):</label>
+                  <div className="flex gap-1 mt-1 justify-center">
+                    {avail.map((v, i) => (
+                      <input key={i} type="number" min="0" value={v} onChange={e => {
+                        const next = [...avail]; next[i] = Number(e.target.value); setAvail(next);
+                      }} className="w-10 bg-[#fdf6e2] border border-[#701a75] p-1 rounded font-black text-center text-[#701a75]" />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-[#f3e8ff] border border-[#701a75] p-3 rounded-xl text-[#701a75] font-black text-center">
+                Calculated Need Matrix = Max - Allocation = [{need.join(', ')}] | Available = [{avail.join(', ')}]
+              </div>
+            </div>
+          )}
+
+          <div className={`p-4 rounded-xl border-2 text-center text-sm font-black ${isSafe ? 'bg-[#059669]/10 border-[#059669] text-[#059669]' : 'bg-[#ef4444]/10 border-[#ef4444] text-[#ef4444]'}`}>
+            {isSafe ? 'SYSTEM SAFE STATE: Safe Execution Sequence Found: < P1 → P3 → P2 >' : 'DEADLOCK RISK DETECTED: Need exceeds Available Resources!'}
+          </div>
+        </div>
+      );
+    }
+
+    // 6. Memory Management Simulator
+    function MemorySim() {
+      const [req, setReq] = useState(212);
+      const [strat, setStrat] = useState('Best-Fit');
+
+      return (
+        <div className="bg-white border-2 border-[#701a75] p-5 rounded-2xl space-y-4 text-xs font-mono shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fdf6e2] p-3 rounded-xl border border-[#701a75]/20">
+            <div className="flex items-center gap-2">
+              <span className="text-[#78350f] font-black">Process Request:</span>
+              <input type="number" value={req} onChange={e => setReq(Number(e.target.value))} className="w-20 bg-white border border-[#701a75] px-2 py-1 rounded font-black text-[#701a75]" />
+              <span className="text-[#78350f]">KB</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[#78350f] font-black">Strategy:</span>
+              <select value={strat} onChange={e => setStrat(e.target.value)} className="bg-white border border-[#701a75] text-[#701a75] p-1.5 rounded-xl font-black">
+                <option value="First-Fit">First-Fit</option>
+                <option value="Best-Fit">Best-Fit</option>
+                <option value="Worst-Fit">Worst-Fit</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-[#78350f] font-black">RAM Hole Partition Layout (Total 1100 KB):</div>
+            <div className="flex h-14 border-2 border-[#701a75] rounded-xl overflow-hidden text-center text-white font-black shadow-inner">
+              <div className="w-[10%] bg-[#78350f]/30 text-[#78350f] border-r border-white flex items-center justify-center text-[10px]">100KB</div>
+              <div className={`w-[45%] flex items-center justify-center transition-all ${strat !== 'Best-Fit' ? 'bg-[#701a75]' : 'bg-[#78350f]/30 text-[#78350f]'}`}>
+                {strat !== 'Best-Fit' ? `Allocated P1 (${req}KB)` : '500KB Hole'}
+              </div>
+              <div className="w-[18%] bg-[#78350f]/30 text-[#78350f] border-r border-white flex items-center justify-center text-[10px]">200KB</div>
+              <div className={`w-[27%] flex items-center justify-center transition-all ${strat === 'Best-Fit' ? 'bg-[#701a75]' : 'bg-[#78350f]/30 text-[#78350f]'}`}>
+                {strat === 'Best-Fit' ? `Allocated P1 (${req}KB)` : '300KB Hole'}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 7. Paging Simulator
+    function PagingSim() {
+      const [addr, setAddr] = useState(2448);
+      const pageSize = 1024;
+      const page = Math.floor(addr / pageSize);
+      const offset = addr % pageSize;
+      const frame = page + 3;
+      const phys = (frame * pageSize) + offset;
+
+      return (
+        <div className="bg-white border-2 border-[#701a75] p-5 rounded-2xl space-y-4 text-xs font-mono shadow-sm">
+          <div className="flex items-center gap-3 bg-[#fdf6e2] p-3 rounded-xl border border-[#701a75]/20">
+            <span className="text-[#78350f] font-black">Logical Address:</span>
+            <input type="number" value={addr} onChange={e => setAddr(Number(e.target.value))} className="w-28 bg-white border border-[#701a75] px-2 py-1 rounded font-black text-[#701a75]" />
+            <span className="text-[#78350f]">bytes</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
+            <div className="bg-[#f3e8ff] border-2 border-[#701a75] p-3 rounded-xl text-[#701a75] font-black space-y-1">
+              <div>Logical Address</div>
+              <div className="text-sm font-black">{addr} B</div>
+              <div className="text-[10px] text-[#78350f]">Page p={page}, Offset d={offset}</div>
+            </div>
+            <div className="bg-[#fef3c7] border-2 border-[#f59e0b] p-3 rounded-xl text-[#78350f] font-black space-y-1">
+              <div>TLB & Page Table Lookup</div>
+              <div className="text-sm font-black text-[#059669]">TLB HIT ⚡</div>
+              <div className="text-[10px]">Page {page} ➔ Frame {frame}</div>
+            </div>
+            <div className="bg-[#059669]/10 border-2 border-[#059669] p-3 rounded-xl text-[#059669] font-black space-y-1">
+              <div>Physical Address RAM</div>
+              <div className="text-sm font-black">{phys} B</div>
+              <div className="text-[10px]">({frame} × 1024) + {offset}</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 8. Page Replacement Simulator (FIFO, OPTIMAL, LRU WITH DROPDOWN SELECTOR)
+    function PageReplaceSim() {
+      const [algo, setAlgo] = useState('FIFO');
+      const [framesCount, setFramesCount] = useState(3);
+      const [pagesStr, setPagesStr] = useState('7, 0, 1, 2, 0, 3, 0, 4, 2, 3');
+      const [step, setStep] = useState(0);
+      const [isPlaying, setIsPlaying] = useState(false);
+      const [speedMult, setSpeedMult] = useState(1);
+
+      const pageList = pagesStr.split(',').map(s => s.trim()).filter(Boolean);
+
+      useEffect(() => {
+        let timer;
+        if (isPlaying && step < pageList.length) {
+          timer = setTimeout(() => setStep(prev => prev + 1), 700 / speedMult);
+        } else if (step >= pageList.length) {
+          setIsPlaying(false);
+        }
+        return () => clearTimeout(timer);
+      }, [isPlaying, step, speedMult, pageList.length]);
+
+      // Calculate dynamic page faults & frames up to step
+      let frames = [];
+      let faultCount = 0;
+      let hitCount = 0;
+      const stepTrace = [];
+
+      for (let i = 0; i < pageList.length; i++) {
+        const p = pageList[i];
+        let hit = false;
+
+        if (frames.includes(p)) {
+          hit = true;
+          hitCount++;
+          if (algo === 'LRU') {
+            // Re-order for LRU
+            frames = [...frames.filter(x => x !== p), p];
+          }
+        } else {
+          faultCount++;
+          if (frames.length < framesCount) {
+            frames.push(p);
+          } else {
+            if (algo === 'FIFO') {
+              frames.shift();
+              frames.push(p);
+            } else if (algo === 'LRU') {
+              frames.shift();
+              frames.push(p);
+            } else if (algo === 'OPTIMAL') {
+              // OPTIMAL: evict page not used for longest future time
+              const rest = pageList.slice(i + 1);
+              let victimIdx = -1;
+              let furthest = -1;
+              for (let f = 0; f < frames.length; f++) {
+                const nextIdx = rest.indexOf(frames[f]);
+                if (nextIdx === -1) {
+                  victimIdx = f;
+                  break;
+                } else if (nextIdx > furthest) {
+                  furthest = nextIdx;
+                  victimIdx = f;
+                }
+              }
+              if (victimIdx !== -1) frames.splice(victimIdx, 1);
+              else frames.shift();
+              frames.push(p);
+            }
+          }
+        }
+        stepTrace.push({ page: p, hit, framesSnapshot: [...frames] });
+      }
+
+      const activeTrace = stepTrace.slice(0, Math.max(1, step));
+      const currentFaults = activeTrace.filter(t => !t.hit).length;
+      const currentHits = activeTrace.filter(t => t.hit).length;
+      const hitRatio = activeTrace.length > 0 ? ((currentHits / activeTrace.length) * 100).toFixed(1) : 0;
+
+      return (
+        <div className="bg-white border-2 border-[#701a75] p-5 rounded-2xl space-y-4 font-mono text-xs shadow-sm">
+          {/* Controls Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fdf6e2] border border-[#701a75]/30 p-3 rounded-xl">
+            <div className="flex items-center gap-3">
+              <span className="text-[#78350f] font-black">Algorithm:</span>
+              <select value={algo} onChange={e => { setAlgo(e.target.value); setStep(0); }} className="bg-white border border-[#701a75] text-[#701a75] p-1.5 rounded-xl font-black">
+                <option value="FIFO">FIFO (First-In, First-Out)</option>
+                <option value="OPTIMAL">Optimal (OPT / Belady's Min)</option>
+                <option value="LRU">LRU (Least Recently Used)</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className="text-[#78350f] font-black">Frames:</span>
+              <input type="number" min="2" max="6" value={framesCount} onChange={e => { setFramesCount(Number(e.target.value)); setStep(0); }} className="w-12 bg-white border border-[#701a75] p-1 rounded font-black text-[#701a75]" />
+
+              <span className="text-[#78350f] font-black">Speed:</span>
+              <select value={speedMult} onChange={e => setSpeedMult(Number(e.target.value))} className="bg-white border border-[#701a75] text-[#701a75] p-1 rounded font-black">
+                <option value={0.5}>0.5x</option>
+                <option value={1}>1.0x</option>
+                <option value={2}>2.0x</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button onClick={() => setIsPlaying(!isPlaying)} className="px-3.5 py-1.5 bg-[#701a75] text-white font-black rounded-xl hover:scale-105 transition">
+                {isPlaying ? '⏸ Pause' : '▶ Play'}
+              </button>
+              <button onClick={() => setStep(prev => Math.min(prev + 1, pageList.length))} className="px-3 py-1.5 bg-[#ec4899] text-white font-black rounded-xl hover:scale-105 transition">
+                ⏭ Step
+              </button>
+              <button onClick={() => { setStep(0); setIsPlaying(false); }} className="px-3 py-1.5 bg-[#fdf6e2] border border-[#78350f] text-[#78350f] font-black rounded-xl">
+                ↺ Reset
+              </button>
+            </div>
+          </div>
+
+          {/* Custom Student Input Reference String */}
+          <div className="flex items-center gap-3 bg-white border border-[#701a75]/20 p-3 rounded-xl">
+            <span className="text-[#78350f] font-black">Page Reference String:</span>
+            <input type="text" value={pagesStr} onChange={e => { setPagesStr(e.target.value); setStep(0); }} className="flex-1 bg-[#fdf6e2] border border-[#701a75] px-2 py-1 rounded font-black text-[#701a75]" />
+          </div>
+
+          {/* Animated Page Grid */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-[#78350f] font-black">
+              <span>Page Replacement Execution Trace ({algo}):</span>
+              <span>Step {activeTrace.length} / {pageList.length}</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {activeTrace.map((t, idx) => (
+                <div key={idx} className={`p-3 rounded-xl border-2 text-center min-w-[60px] space-y-1 transition-all ${
+                  t.hit ? 'bg-[#059669]/10 border-[#059669] text-[#059669]' : 'bg-[#ef4444]/10 border-[#ef4444] text-[#ef4444]'
+                }`}>
+                  <div className="font-black text-sm">{t.page}</div>
+                  <div className={`text-[9px] font-black px-1 py-0.5 rounded text-white ${t.hit ? 'bg-[#059669]' : 'bg-[#ef4444]'}`}>
+                    {t.hit ? 'HIT' : 'FAULT'}
+                  </div>
+                  <div className="text-[8px] text-gray-500 font-mono">[{t.framesSnapshot.join(',')}]</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="bg-[#f3e8ff] border border-[#701a75] p-2.5 rounded-xl text-[#701a75] font-black">Page Faults: {currentFaults}</div>
+            <div className="bg-[#f3e8ff] border border-[#701a75] p-2.5 rounded-xl text-[#701a75] font-black">Page Hits: {currentHits}</div>
+            <div className="bg-[#059669]/10 border border-[#059669] p-2.5 rounded-xl text-[#059669] font-black">Hit Ratio: {hitRatio}%</div>
+          </div>
+        </div>
+      );
+    }
+
+    // 9. Disk Scheduling Simulator (FCFS → SSTF → SCAN → C-SCAN → LOOK → C-LOOK WITH DROPDOWN SELECTOR)
+    function DiskSim() {
+      const [algo, setAlgo] = useState('SSTF');
+      const [head, setHead] = useState(50);
+      const [queueStr, setQueueStr] = useState('82, 170, 43, 140, 24, 16, 190');
+      const [step, setStep] = useState(0);
+      const [isPlaying, setIsPlaying] = useState(false);
+      const [speedMult, setSpeedMult] = useState(1);
+
+      const queue = queueStr.split(',').map(s => Number(s.trim())).filter(n => !isNaN(n));
+
+      // Calculate path according to chosen algorithm
+      let path = [head];
+      if (algo === 'FCFS') {
+        path = [head, ...queue];
+      } else if (algo === 'SSTF') {
+        let curr = head;
+        let unvisited = [...queue];
+        while (unvisited.length > 0) {
+          unvisited.sort((a, b) => Math.abs(a - curr) - Math.abs(b - curr));
+          curr = unvisited.shift();
+          path.push(curr);
+        }
+      } else if (algo === 'SCAN') {
+        const left = queue.filter(q => q < head).sort((a, b) => b - a);
+        const right = queue.filter(q => q >= head).sort((a, b) => a - b);
+        path = [head, ...right, 199, ...left];
+      } else if (algo === 'C-SCAN') {
+        const left = queue.filter(q => q < head).sort((a, b) => a - b);
+        const right = queue.filter(q => q >= head).sort((a, b) => a - b);
+        path = [head, ...right, 199, 0, ...left];
+      } else if (algo === 'LOOK') {
+        const left = queue.filter(q => q < head).sort((a, b) => b - a);
+        const right = queue.filter(q => q >= head).sort((a, b) => a - b);
+        path = [head, ...right, ...left];
+      } else if (algo === 'C-LOOK') {
+        const left = queue.filter(q => q < head).sort((a, b) => a - b);
+        const right = queue.filter(q => q >= head).sort((a, b) => a - b);
+        path = [head, ...right, ...left];
+      }
+
+      useEffect(() => {
+        let timer;
+        if (isPlaying && step < path.length - 1) {
+          timer = setTimeout(() => setStep(prev => prev + 1), 600 / speedMult);
+        } else if (step >= path.length - 1) {
+          setIsPlaying(false);
+        }
+        return () => clearTimeout(timer);
+      }, [isPlaying, step, speedMult, path.length]);
+
+      // Calculate total seek distance up to current step
+      let totalSeek = 0;
+      for (let i = 0; i < step; i++) {
+        totalSeek += Math.abs(path[i + 1] - path[i]);
+      }
+
+      const activeHead = path[Math.min(step, path.length - 1)];
+
+      return (
+        <div className="bg-white border-2 border-[#701a75] p-5 rounded-2xl space-y-4 font-mono text-xs shadow-sm">
+          {/* Controls Header */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fdf6e2] border border-[#701a75]/30 p-3 rounded-xl">
+            <div className="flex items-center gap-3">
+              <span className="text-[#78350f] font-black">Disk Algorithm:</span>
+              <select value={algo} onChange={e => { setAlgo(e.target.value); setStep(0); }} className="bg-white border border-[#701a75] text-[#701a75] p-1.5 rounded-xl font-black">
+                <option value="FCFS">FCFS (First-Come First-Served)</option>
+                <option value="SSTF">SSTF (Shortest Seek Time First)</option>
+                <option value="SCAN">SCAN (Elevator)</option>
+                <option value="C-SCAN">C-SCAN (Circular SCAN)</option>
+                <option value="LOOK">LOOK</option>
+                <option value="C-LOOK">C-LOOK (Circular LOOK)</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className="text-[#78350f] font-black">Speed:</span>
+              <select value={speedMult} onChange={e => setSpeedMult(Number(e.target.value))} className="bg-white border border-[#701a75] text-[#701a75] p-1 rounded font-black">
+                <option value={0.5}>0.5x</option>
+                <option value={1}>1.0x</option>
+                <option value={2}>2.0x</option>
+              </select>
+
+              <button onClick={() => setIsPlaying(!isPlaying)} className="px-3.5 py-1.5 bg-[#701a75] text-white font-black rounded-xl hover:scale-105 transition">
+                {isPlaying ? '⏸ Pause' : '▶ Play'}
+              </button>
+              <button onClick={() => setStep(prev => Math.min(prev + 1, path.length - 1))} className="px-3 py-1.5 bg-[#ec4899] text-white font-black rounded-xl hover:scale-105 transition">
+                ⏭ Step
+              </button>
+              <button onClick={() => { setStep(0); setIsPlaying(false); }} className="px-3 py-1.5 bg-[#fdf6e2] border border-[#78350f] text-[#78350f] font-black rounded-xl">
+                ↺ Reset
+              </button>
+            </div>
+          </div>
+
+          {/* Custom Student Input Fields */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white border border-[#701a75]/20 p-3 rounded-xl">
+            <div className="space-y-1">
+              <label className="text-[#701a75] font-black">Initial Head Cylinder ({head}):</label>
+              <input type="range" min="0" max="199" value={head} onChange={e => { setHead(Number(e.target.value)); setStep(0); }} className="w-full accent-[#701a75]" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[#701a75] font-black">Request Queue (Cylinders 0-199):</label>
+              <input type="text" value={queueStr} onChange={e => { setQueueStr(e.target.value); setStep(0); }} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1 rounded font-black text-[#701a75]" />
+            </div>
+          </div>
+
+          {/* Animated Cylinder Track Bar */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-[#78350f] font-black">
+              <span>Disk Head Arm Position (Cylinder {activeHead}):</span>
+              <span>Step {step} / {path.length - 1}</span>
+            </div>
+            <div className="relative w-full bg-[#fdf6e2] border-2 border-[#701a75] h-12 rounded-xl flex items-center px-2 overflow-hidden shadow-inner">
+              <div style={{ left: `${(activeHead/199)*92}%` }} className="absolute w-6 h-8 bg-[#ec4899] border-2 border-white rounded-md flex items-center justify-center text-white text-[9px] font-black transition-all shadow-md">
+                H
+              </div>
+            </div>
+          </div>
+
+          <div className="text-[#059669] font-black text-sm text-center bg-[#059669]/10 p-3 rounded-xl border border-[#059669]">
+            {algo} Calculated Path: {path.slice(0, step + 1).join(' ➔ ')} | Total Seek Distance = {totalSeek} Cylinders
+          </div>
+        </div>
+      );
+    }
+
+    // 10. File Systems Simulator (Contiguous, Linked, and Indexed Allocation)
+    function FileSystemSim() {
+      const [method, setMethod] = useState('indexed');
+      const [fname, setFname] = useState('report.pdf');
+      const [numBlocks, setNumBlocks] = useState(4);
+
+      return (
+        <div className="bg-white border-2 border-[#701a75] p-5 rounded-2xl space-y-4 text-xs font-mono shadow-sm">
+          {/* Method Selector */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fdf6e2] p-3 rounded-xl border border-[#701a75]/20">
+            <div className="flex items-center gap-3">
+              <span className="text-[#78350f] font-black">File Allocation Method:</span>
+              <select value={method} onChange={e => setMethod(e.target.value)} className="bg-white border border-[#701a75] text-[#701a75] p-1.5 rounded-xl font-black">
+                <option value="contiguous">Contiguous Allocation (Continuous Sectors)</option>
+                <option value="linked">Linked Allocation (Pointer Chains)</option>
+                <option value="indexed">Indexed Allocation (Index Block / Inode)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Main Idea Explanation Card */}
+          <div className="bg-[#f3e8ff] border border-[#701a75] p-3.5 rounded-xl text-[#701a75] space-y-1">
+            <div className="font-black text-sm">
+              {method === 'contiguous' && '📁 Contiguous Allocation'}
+              {method === 'linked' && '🔗 Linked Allocation'}
+              {method === 'indexed' && '🗂 Indexed Allocation (Inode)'}
+            </div>
+            <div className="text-xs text-[#78350f] font-bold">
+              {method === 'contiguous' && 'Main Idea: File blocks are stored continuously on sequential disk sectors. Simple and fast, but prone to external fragmentation.'}
+              {method === 'linked' && 'Main Idea: Each disk block contains file data AND a pointer to the next block. Eliminates external fragmentation, but requires sequential traversal.'}
+              {method === 'indexed' && 'Main Idea: An Index Block / Inode stores pointers to all file blocks together in an array. Supports fast direct access without external fragmentation!'}
+            </div>
+          </div>
+
+          {/* Student Inputs */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white border border-[#701a75]/20 p-3 rounded-xl">
+            <div className="space-y-1">
+              <label className="text-[#701a75] font-black">File Name:</label>
+              <input type="text" value={fname} onChange={e => setFname(e.target.value)} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1 rounded font-black text-[#701a75]" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[#701a75] font-black">File Size ({numBlocks} Blocks):</label>
+              <input type="range" min="1" max="6" value={numBlocks} onChange={e => setNumBlocks(Number(e.target.value))} className="w-full accent-[#701a75]" />
+            </div>
+          </div>
+
+          {/* Sector Visualization Grid */}
+          <div className="space-y-2">
+            <div className="text-[#78350f] font-black">Disk Sector Blocks (16 Sectors Total):</div>
+            <div className="grid grid-cols-8 gap-2 text-center">
+              {Array.from({ length: 16 }).map((_, i) => {
+                let label = `Sec #${i}`;
+                let style = 'bg-[#fdf6e2] text-[#78350f] border-[#78350f]/20';
+
+                if (method === 'contiguous') {
+                  const contiguousSectors = Array.from({ length: numBlocks }, (_, b) => 4 + b);
+                  if (contiguousSectors.includes(i)) {
+                    label = `BLK #${i - 4}`;
+                    style = 'bg-[#701a75] text-white border-purple-900 shadow-sm';
+                  }
+                } else if (method === 'linked') {
+                  const linkedSectors = [2, 7, 12, 15, 3, 9].slice(0, numBlocks);
+                  if (linkedSectors.includes(i)) {
+                    const chainIdx = linkedSectors.indexOf(i);
+                    const nextSec = linkedSectors[chainIdx + 1];
+                    label = nextSec !== undefined ? `SEC ${i} ➔ ${nextSec}` : `SEC ${i} ➔ END`;
+                    style = 'bg-[#ec4899] text-white border-pink-900 shadow-sm';
+                  }
+                } else if (method === 'indexed') {
+                  const indexedData = [4, 7, 12, 15, 2, 9].slice(0, numBlocks);
+                  if (i === 5) {
+                    label = 'INDEX #5';
+                    style = 'bg-[#f59e0b] text-white border-amber-600 shadow-sm';
+                  } else if (indexedData.includes(i)) {
+                    label = `PTR #${indexedData.indexOf(i)}`;
+                    style = 'bg-[#701a75] text-white border-purple-900 shadow-sm';
+                  }
+                }
+
+                return (
+                  <div key={i} className={`p-2 rounded-xl border-2 font-black text-[10px] ${style}`}>
+                    {label}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // STEP 3: TASK STEP (CUSTOM STUDENT INPUTS & VALIDATION)
+    // -------------------------------------------------------------
+    function TaskStep({ moduleData, onDone }) {
+      const { task } = moduleData;
+      const [selected, setSelected] = useState(null);
+      const [submitted, setSubmitted] = useState(false);
+      const [customBurst, setCustomBurst] = useState("24, 3, 3");
+
+      const handleSubmit = () => {
+        if (selected === null) return;
+        setSubmitted(true);
+        if (selected === task.correctAnswer) {
+          setTimeout(() => onDone(), 600);
+        }
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-white border-2 border-[#701a75] p-6 rounded-2xl space-y-4 shadow-sm">
+            <h3 className="font-black text-[#701a75] text-base">{task.title}</h3>
+            <p className="text-[#78350f] text-xs font-extrabold">{task.instructions}</p>
+
+            {moduleData.id === 'cpu-scheduling' && (
+              <div className="bg-[#fdf6e2] p-4 rounded-xl border border-[#78350f]/20 space-y-2">
+                <label className="text-xs font-mono font-black text-[#701a75]">Custom Process Burst Times (comma-separated):</label>
+                <input
+                  type="text"
+                  value={customBurst}
+                  onChange={(e) => setCustomBurst(e.target.value)}
+                  className="w-full bg-white border border-[#701a75] rounded-xl p-2 text-xs font-mono font-black text-[#701a75]"
+                />
+              </div>
+            )}
+
+            <div className="bg-[#fdf6e2] p-4 rounded-xl border border-[#701a75]/30 text-[#3b0764] text-sm font-black">
+              {task.question}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {task.options.map((opt, idx) => {
+              let style = "bg-white border-[#78350f]/20 text-[#3b0764]";
+              if (selected === idx) style = "bg-[#f3e8ff] border-[#701a75] text-[#701a75] font-black";
+              if (submitted) {
+                if (idx === task.correctAnswer) style = "bg-[#059669]/10 border-[#059669] text-[#059669] font-black";
+                else if (selected === idx) style = "bg-[#ef4444]/10 border-[#ef4444] text-[#ef4444]";
+              }
+
+              return (
+                <button
+                  key={idx}
+                  disabled={submitted}
+                  onClick={() => setSelected(idx)}
+                  className={`w-full p-4 rounded-2xl border-2 text-left text-xs font-extrabold transition ${style}`}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+
+          {!submitted ? (
+            <button onClick={handleSubmit} disabled={selected === null} className="w-full py-4 bg-gradient-to-r from-[#701a75] to-[#7e22ce] text-white font-black text-sm rounded-xl shadow-md disabled:opacity-40 hover:scale-[1.01] transition">
+              Submit Task Solution
+            </button>
+          ) : (
+            <div className={`p-4 rounded-xl border-2 text-xs font-mono font-black ${selected === task.correctAnswer ? 'bg-[#059669]/10 border-[#059669] text-[#059669]' : 'bg-[#ef4444]/10 border-[#ef4444] text-[#ef4444]'}`}>
+              {task.explanation}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // STEP 4: TERMINAL CLI SHELL STEP
+    // -------------------------------------------------------------
+    function TerminalStep({ moduleId, onDone }) {
+      const [input, setInput] = useState('');
+      const [history, setHistory] = useState([
+        { type: 'sys', text: 'Simulated OS CLI Shell v6.0' },
+        { type: 'sys', text: 'Type "help" to view supported commands.' }
+      ]);
+
+      const handleCmd = (cmdStr) => {
+        const cmd = cmdStr.trim().toLowerCase();
+        if (!cmd) return;
+
+        let out = [];
+        if (cmd === 'help') out = ['Available commands: help, cpu schedule, memory, disk, deadlock, paging, sync, clear'];
+        else if (cmd === 'cpu schedule') out = ['[CPU Scheduler] Gantt Chart generated. Avg WT = 7.33 ms'];
+        else if (cmd === 'memory') out = ['[Memory] Allocated P1 (212KB) into Block 1 (500KB) via Best-Fit.'];
+        else if (cmd === 'disk') out = ['[Disk] SSTF Head Path: 50 -> 43 -> 82 -> 170. Total Seek: 134 Cylinders.'];
+        else if (cmd === 'deadlock') out = ['[Banker] Safe Sequence found: P1 -> P3 -> P2. No Deadlock.'];
+        else if (cmd === 'clear') { setHistory([]); setInput(''); return; }
+        else out = [`os-shell: command not found: ${cmd}. Type "help".`];
+
+        setHistory(prev => [...prev, { type: 'user', text: `$ ${cmd}` }, ...out.map(t => ({ type: 'out', text: t }))]);
+        setInput('');
+      };
+
+      return (
+        <div className="bg-[#3b0764] border-3 border-[#701a75] rounded-2xl overflow-hidden font-mono text-xs shadow-pop">
+          <div className="bg-[#701a75] px-4 py-3 text-white font-black flex justify-between">
+            <span>simulated-os-shell ~ zsh</span>
+            <button onClick={() => setHistory([])} className="hover:underline">Clear</button>
+          </div>
+
+          <div className="p-4 h-64 overflow-y-auto space-y-1.5 text-white">
+            {history.map((h, i) => (
+              <div key={i} className={h.type === 'user' ? 'text-[#f59e0b] font-black' : h.type === 'sys' ? 'text-purple-200' : 'text-[#34d399]'}>
+                {h.text}
+              </div>
+            ))}
+          </div>
+
+          <form onSubmit={(e) => { e.preventDefault(); handleCmd(input); }} className="bg-[#2e1065] p-3 border-t border-[#701a75] flex gap-2">
+            <span className="text-[#f59e0b] font-black">$</span>
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Try 'help', 'cpu schedule', 'memory', 'disk'..."
+              className="w-full bg-transparent outline-none text-white font-black placeholder-purple-300/50"
+            />
+          </form>
+
+          <div className="p-3 bg-white">
+            <button onClick={onDone} className="w-full py-3 bg-gradient-to-r from-[#701a75] to-[#7e22ce] text-white font-black text-xs rounded-xl shadow-md hover:scale-[1.01] transition">
+              ✓ Complete CLI Shell & Next Task ➔
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // STEP 5: QUIZ STEP (EXACTLY 5 QUIZZES PER MODULE)
+    // -------------------------------------------------------------
+    function QuizStep({ moduleData, setQuizScore, onDone }) {
+      const [answers, setAnswers] = useState({});
+      const [submitted, setSubmitted] = useState(false);
+      const questions = moduleData.quiz;
+
+      const submitQuiz = () => {
+        let correct = 0;
+        questions.forEach(q => {
+          if (answers[q.id] === q.correctIndex) correct++;
+        });
+        const score = Math.round((correct / questions.length) * 100);
+        setSubmitted(true);
+        setQuizScore(moduleData.id, score);
+        setTimeout(() => onDone(), 800);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-white border-2 border-[#701a75] p-4 rounded-xl text-xs font-mono font-black text-[#701a75] flex justify-between">
+            <span>❓ Module Quiz (5 Questions)</span>
+            <span>Answer all 5 to complete</span>
+          </div>
+
+          {questions.map((q, idx) => (
+            <div key={q.id} className="bg-white border-2 border-[#701a75] p-5 rounded-2xl space-y-3 shadow-sm">
+              <h4 className="font-black text-[#3b0764] text-sm">{idx + 1}. {q.question}</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {q.options.map((opt, oIdx) => {
+                  let style = "bg-[#fdf6e2] border-[#78350f]/20 text-[#3b0764]";
+                  if (answers[q.id] === oIdx) style = "bg-[#f3e8ff] border-[#701a75] text-[#701a75] font-black";
+                  if (submitted) {
+                    if (oIdx === q.correctIndex) style = "bg-[#059669]/10 border-[#059669] text-[#059669] font-black";
+                    else if (answers[q.id] === oIdx) style = "bg-[#ef4444]/10 border-[#ef4444] text-[#ef4444]";
+                  }
+                  return (
+                    <button
+                      key={oIdx}
+                      disabled={submitted}
+                      onClick={() => setAnswers({ ...answers, [q.id]: oIdx })}
+                      className={`p-3.5 rounded-xl border-2 text-left text-xs font-extrabold transition ${style}`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+              {submitted && <div className="text-xs text-[#78350f] bg-[#fdf6e2] p-3 rounded-xl font-bold leading-relaxed">{q.explanation}</div>}
+            </div>
+          ))}
+
+          {!submitted ? (
+            <button onClick={submitQuiz} disabled={Object.keys(answers).length < questions.length} className="w-full py-4 bg-gradient-to-r from-[#701a75] to-[#7e22ce] text-white font-black text-sm rounded-xl shadow-md disabled:opacity-40 hover:scale-[1.01] transition">
+              Submit Quiz Answers ({Object.keys(answers).length} / 5 Answered)
+            </button>
+          ) : (
+            <div className="bg-white border-2 border-[#059669] p-6 rounded-2xl text-center space-y-2 shadow-sm">
+              <div className="text-xl font-black text-[#059669]">Quiz Submitted & Score Recorded!</div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // -------------------------------------------------------------
+    // STEP 6: DEDICATED COMPLETED STEP
+    // -------------------------------------------------------------
+    function CompletedStep({ moduleData, onDashboard }) {
+      return (
+        <div className="bg-white border-4 border-[#701a75] p-8 sm:p-12 rounded-3xl text-center space-y-6 shadow-pop">
+          <div className="text-6xl animate-bounce">🎓</div>
+          <div>
+            <div className="text-xs font-mono font-black text-[#701a75] uppercase tracking-widest">MODULE COMPLETED</div>
+            <h2 className="text-3xl font-black text-[#3b0764] mt-1">Module {moduleData.num}: {moduleData.title}</h2>
+            <p className="text-sm text-[#78350f] font-extrabold mt-2 max-w-md mx-auto">
+              All 5 steps — Learn, Animation, Task, Terminal, and Quiz — are fully finished for this module!
+            </p>
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-2">
+            {['📖 Learn', '🎬 Animation', '🛠 Task', '💻 Terminal', '❓ Quiz'].map((label, idx) => (
+              <span key={idx} className="bg-[#f3e8ff] border border-[#701a75] text-[#701a75] font-black px-3 py-1 rounded-full text-xs">
+                ✓ {label}
+              </span>
+            ))}
+          </div>
+
+          <button onClick={onDashboard} className="px-8 py-4 bg-gradient-to-r from-[#701a75] to-[#7e22ce] text-white font-black text-sm rounded-2xl shadow-lg hover:scale-105 transition">
+            🏠 Return to Main Dashboard
+          </button>
+        </div>
+      );
+    }
+
+    // Render App into DOM
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
