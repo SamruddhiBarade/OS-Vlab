@@ -483,7 +483,7 @@
     // -------------------------------------------------------------
     // STUDENT LOGIN VIEW
     // -------------------------------------------------------------
-    function LoginView({ onLogin }) {
+    function LoginView({ onLogin, dbInfo, isLoggingIn }) {
       const [name, setName] = useState('');
       const [rollNo, setRollNo] = useState('');
       const [dept, setDept] = useState('Computer Science & Engineering');
@@ -520,8 +520,19 @@
                 <h1 className="text-2xl sm:text-3xl font-black text-[#3b0764] mt-2">
                   OS Virtual Lab Login
                 </h1>
-                <p className="text-xs text-[#78350f] font-extrabold mt-1">
-                  Enter your student credentials to access 10 interactive OS virtual lab modules
+
+                {/* Live Database Connection Indicator */}
+                <div className="mt-2.5 flex items-center justify-center">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-black border shadow-sm ${
+                    dbInfo?.connected ? 'bg-emerald-50 text-emerald-800 border-emerald-400' : 'bg-amber-50 text-amber-800 border-amber-300'
+                  }`}>
+                    <span className={`w-2 h-2 rounded-full ${dbInfo?.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
+                    <span>{dbInfo?.connected ? `MongoDB: ${dbInfo.database || 'os_virtual_lab'} (Live)` : 'MongoDB: Connecting / Local Mode'}</span>
+                  </span>
+                </div>
+
+                <p className="text-xs text-[#78350f] font-extrabold mt-2">
+                  Enter student credentials to load & sync progress with MongoDB
                 </p>
               </div>
             </div>
@@ -563,9 +574,17 @@
 
               <button
                 type="submit"
-                className="w-full py-4 bg-gradient-to-r from-[#701a75] to-[#7e22ce] text-white font-black text-sm rounded-2xl shadow-lg hover:scale-[1.02] transition mt-2"
+                disabled={isLoggingIn}
+                className="w-full py-4 bg-gradient-to-r from-[#701a75] to-[#7e22ce] text-white font-black text-sm rounded-2xl shadow-lg hover:scale-[1.02] transition mt-2 disabled:opacity-60 flex items-center justify-center gap-2"
               >
-                🚀 Enter Virtual Lab ➔
+                {isLoggingIn ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    <span>Connecting to MongoDB...</span>
+                  </>
+                ) : (
+                  <span>🚀 Enter Virtual Lab ➔</span>
+                )}
               </button>
             </form>
 
@@ -584,6 +603,11 @@
     }
 
     // -------------------------------------------------------------
+    // API BASE CONFIGURATION FOR MONGODB BACKEND
+    // -------------------------------------------------------------
+    const API_BASE = window.location.origin.includes(':5000') ? '' : 'http://localhost:5000';
+
+    // -------------------------------------------------------------
     // MAIN APP COMPONENT
     // -------------------------------------------------------------
     function App() {
@@ -600,37 +624,78 @@
       const [sidebarOpen, setSidebarOpen] = useState(false);
       const [showGraduation, setShowGraduation] = useState(false);
       const [showBadgeModal, setShowBadgeModal] = useState(false);
+      const [showDbModal, setShowDbModal] = useState(false);
+      const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
+      const [leaderboardData, setLeaderboardData] = useState([]);
+      const [certData, setCertData] = useState(null);
       const [studentName, setStudentName] = useState(() => user ? user.name : 'Alex Morgan');
       const [taskModal, setTaskModal] = useState(null); // { stepName, onNext }
       const [toast, setToast] = useState(null); // { message, type }
 
-      const handleLogin = (userData) => {
-        setUser(userData);
-        setStudentName(userData.name);
-        localStorage.setItem('os_virtlab_user_v1', JSON.stringify(userData));
-        showNotification(`👋 Welcome ${userData.name}! Logged into OS Virtual Lab.`);
-      };
+      // MongoDB Live Status & Sync Indicators
+      const [dbInfo, setDbInfo] = useState({ connected: false, database: 'os_virtual_lab', students: 0, certs: 0 });
+      const [isLoggingIn, setIsLoggingIn] = useState(false);
+      const [isSyncing, setIsSyncing] = useState(false);
 
-      const handleLogout = () => {
-        setUser(null);
-        localStorage.removeItem('os_virtlab_user_v1');
-      };
-
-      const [progress, setProgress] = useState(() => {
-        const saved = localStorage.getItem('os_virtlab_prog_v6');
-        if (saved) {
-          try { return JSON.parse(saved); } catch (e) {}
+      // Check MongoDB Backend Health
+      const checkDbStatus = async () => {
+        try {
+          const res = await fetch(`${API_BASE}/api/status`);
+          const data = await res.json();
+          if (data.success && data.status === 'connected') {
+            setDbInfo({
+              connected: true,
+              database: data.database || 'os_virtual_lab',
+              students: data.totalStudents || 0,
+              certs: data.totalCertificates || 0
+            });
+          } else {
+            setDbInfo(prev => ({ ...prev, connected: false }));
+          }
+        } catch (e) {
+          setDbInfo(prev => ({ ...prev, connected: false }));
         }
+      };
+
+      useEffect(() => {
+        checkDbStatus();
+        const interval = setInterval(checkDbStatus, 15000);
+        return () => clearInterval(interval);
+      }, []);
+
+      // Helper to generate a blank 0% progress structure
+      const createEmptyProgress = () => {
         const init = {};
         MODULES_DATA.forEach(m => {
           init[m.id] = { learn: false, animation: false, task: false, terminal: false, quiz: false, completed: false, quizScore: 0 };
         });
         return init;
+      };
+
+      // Progress state: strictly per-student, starting empty unless student has existing saved data
+      const [progress, setProgress] = useState(() => {
+        // Clear any old legacy global key
+        try { localStorage.removeItem('os_virtlab_prog_v6'); } catch (e) {}
+
+        const empty = createEmptyProgress();
+        if (user && user.rollNo) {
+          const saved = localStorage.getItem(`os_virtlab_prog_${user.rollNo}`);
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved);
+              return { ...empty, ...parsed };
+            } catch (e) {}
+          }
+        }
+        return empty;
       });
 
+      // Save progress under this student's specific roll number in localStorage
       useEffect(() => {
-        localStorage.setItem('os_virtlab_prog_v6', JSON.stringify(progress));
-      }, [progress]);
+        if (user && user.rollNo) {
+          localStorage.setItem(`os_virtlab_prog_${user.rollNo}`, JSON.stringify(progress));
+        }
+      }, [progress, user]);
 
       useEffect(() => {
         if (window.lucide) window.lucide.createIcons();
@@ -639,6 +704,99 @@
       const showNotification = (msg, type = 'success') => {
         setToast({ message: msg, type });
         setTimeout(() => setToast(null), 3500);
+      };
+
+      // Synchronize Progress with MongoDB
+      const syncProgressToMongo = async (progToSync) => {
+        if (!user || !user.rollNo) return;
+        setIsSyncing(true);
+        try {
+          const sum = MODULES_DATA.reduce((acc, m) => {
+            const mod = progToSync[m.id];
+            if (!mod) return acc;
+            const done = [mod.learn, mod.animation, mod.task, mod.terminal, mod.quiz].filter(Boolean).length;
+            return acc + Math.round((done / 5) * 100);
+          }, 0);
+          const overallVal = Math.round(sum / MODULES_DATA.length);
+
+          await fetch(`${API_BASE}/api/progress/${encodeURIComponent(user.rollNo)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ progress: progToSync, overallPercent: overallVal })
+          });
+        } catch (e) {
+          console.warn("MongoDB sync fallback:", e);
+        } finally {
+          setIsSyncing(false);
+        }
+      };
+
+      const handleLogin = async (userData) => {
+        setIsLoggingIn(true);
+        setUser(userData);
+        setStudentName(userData.name);
+        localStorage.setItem('os_virtlab_user_v1', JSON.stringify(userData));
+
+        // Always construct fresh, accurate progress for this specific student
+        const emptyProg = createEmptyProgress();
+
+        try {
+          const res = await fetch(`${API_BASE}/api/students/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(userData)
+          });
+          const data = await res.json();
+          if (data.success) {
+            showNotification(`🟢 Connected to MongoDB! Student ${userData.name} loaded.`);
+
+            // Build student's real progress from MongoDB record
+            const studentProg = { ...emptyProg };
+            if (data.progress && typeof data.progress === 'object') {
+              for (const k in data.progress) {
+                if (studentProg[k]) {
+                  studentProg[k] = { ...studentProg[k], ...data.progress[k] };
+                }
+              }
+            }
+            setProgress(studentProg);
+            localStorage.setItem(`os_virtlab_prog_${userData.rollNo}`, JSON.stringify(studentProg));
+            setCertData(data.certificate || null);
+            setShowGraduation(false);
+            checkDbStatus();
+          } else {
+            // Check student-specific local cache
+            const cached = localStorage.getItem(`os_virtlab_prog_${userData.rollNo}`);
+            if (cached) {
+              try { setProgress({ ...emptyProg, ...JSON.parse(cached) }); } catch (e) { setProgress(emptyProg); }
+            } else {
+              setProgress(emptyProg);
+            }
+            showNotification(`👋 Welcome ${userData.name}! (Using local cache)`);
+          }
+        } catch (err) {
+          // Offline mode - load student-specific cache or fresh empty
+          const cached = localStorage.getItem(`os_virtlab_prog_${userData.rollNo}`);
+          if (cached) {
+            try { setProgress({ ...emptyProg, ...JSON.parse(cached) }); } catch (e) { setProgress(emptyProg); }
+          } else {
+            setProgress(emptyProg);
+          }
+          showNotification(`👋 Welcome ${userData.name}! (Offline mode)`);
+        } finally {
+          setIsLoggingIn(false);
+        }
+      };
+
+      const handleLogout = () => {
+        setUser(null);
+        localStorage.removeItem('os_virtlab_user_v1');
+        setProgress(createEmptyProgress());
+        setCertData(null);
+        setShowGraduation(false);
+        setCurrentModuleId(null);
+        setCurrentStep(1);
+        showNotification("👋 Logged out successfully.");
       };
 
       const markStepComplete = (modId, stepName) => {
@@ -654,11 +812,12 @@
             try { confetti({ particleCount: 150, spread: 100, origin: { y: 0.5 } }); } catch (e) {}
           }
 
+          syncProgressToMongo(nextProg);
           return nextProg;
         });
 
         const activeMod = MODULES_DATA.find(m => m.id === modId);
-        showNotification(`⚡ Progress Updated: ${activeMod ? activeMod.title : 'Module'} ${stepName.toUpperCase()} Verified!`);
+        showNotification(`⚡ Progress Synced: ${activeMod ? activeMod.title : 'Module'} ${stepName.toUpperCase()} Verified!`);
       };
 
       const setQuizScore = (modId, score) => {
@@ -670,9 +829,10 @@
 
           const doneCount = Object.values(nextProg).filter(m => m.completed).length;
           if (doneCount >= 10) setShowGraduation(true);
+          syncProgressToMongo(nextProg);
           return nextProg;
         });
-        showNotification(`🎉 Quiz Submitted & Verified! Score: ${score}%`);
+        showNotification(`🎉 Quiz Submitted & Recorded in MongoDB! Score: ${score}%`);
       };
 
       const getModulePercent = (modId) => {
@@ -698,34 +858,113 @@
         });
       };
 
+      const handleOpenCertificate = async () => {
+        if (getOverallPercent() < 100) {
+          showNotification(`🔒 Certificate Locked! You must complete all 10 modules (100% course progress) to generate your certificate. Current progress: ${getOverallPercent()}%`, 'error');
+          return;
+        }
+        setShowGraduation(true);
+        // Persist official certificate in MongoDB
+        try {
+          const res = await fetch(`${API_BASE}/api/certificates/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              rollNo: user.rollNo,
+              studentName: studentName || user.name,
+              dept: user.dept
+            })
+          });
+          const data = await res.json();
+          if (data.success && data.certificate) {
+            setCertData(data.certificate);
+            showNotification(`🎓 Certificate verified & stored in MongoDB! ID: ${data.certificate.certificateId}`);
+            checkDbStatus();
+          }
+        } catch (e) {
+          console.warn("Certificate DB save fallback:", e);
+        }
+      };
+
+      const fetchLeaderboard = async () => {
+        try {
+          const res = await fetch(`${API_BASE}/api/leaderboard`);
+          const data = await res.json();
+          if (data.success) {
+            setLeaderboardData(data.leaderboard || []);
+          }
+        } catch (e) {
+          console.warn("Could not fetch leaderboard", e);
+        }
+        setShowLeaderboardModal(true);
+      };
+
+      const handleResetDbProgress = async () => {
+        if (!window.confirm("Are you sure you want to reset all your progress in the MongoDB database?")) return;
+        try {
+          await fetch(`${API_BASE}/api/progress/${encodeURIComponent(user.rollNo)}/reset`, { method: 'POST' });
+          const fresh = createEmptyProgress();
+          setProgress(fresh);
+          localStorage.removeItem(`os_virtlab_prog_${user.rollNo}`);
+          setCertData(null);
+          setShowGraduation(false);
+          showNotification("Progress reset to 0% in MongoDB.");
+          setShowDbModal(false);
+        } catch (e) {
+          showNotification("Could not reset progress", "error");
+        }
+      };
+
       const activeModule = MODULES_DATA.find(m => m.id === currentModuleId);
 
       // Render Login Screen if not logged in
       if (!user) {
-        return <LoginView onLogin={handleLogin} />;
+        return <LoginView onLogin={handleLogin} dbInfo={dbInfo} isLoggingIn={isLoggingIn} />;
       }
 
       return (
         <div className="min-h-screen flex flex-col bg-[#fdf6e2] relative">
           {/* Top Header */}
-          <header className="h-16 border-b-2 border-[#701a75] bg-white sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6 shadow-sm">
-            <div className="flex items-center gap-3">
+          <header className="h-16 border-b-2 border-[#701a75] bg-white sticky top-0 z-30 flex items-center justify-between px-3 sm:px-6 shadow-sm">
+            <div className="flex items-center gap-2 sm:gap-3">
               <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 text-[#701a75] hover:bg-[#f3e8ff] rounded-xl md:hidden">
                 <i data-lucide="menu" className="w-5 h-5"></i>
               </button>
-              <div onClick={() => setCurrentModuleId(null)} className="flex items-center gap-2.5 cursor-pointer group">
+              <div onClick={() => setCurrentModuleId(null)} className="flex items-center gap-2 cursor-pointer group">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#701a75] to-[#ec4899] flex items-center justify-center text-white font-bold shadow-md group-hover:scale-105 transition">
                   <i data-lucide="cpu" className="w-5 h-5"></i>
                 </div>
                 <div>
-                  <span className="font-black text-base tracking-tight text-[#701a75] flex items-center gap-2">
-                    OS Virtual Lab <span className="text-[10px] font-mono bg-[#f3e8ff] text-[#701a75] border border-[#701a75] px-2 py-0.5 rounded-full font-bold">v6.0</span>
+                  <span className="font-black text-sm sm:text-base tracking-tight text-[#701a75] flex items-center gap-1.5 sm:gap-2">
+                    OS Virtual Lab <span className="text-[10px] font-mono bg-[#f3e8ff] text-[#701a75] border border-[#701a75] px-1.5 py-0.5 rounded-full font-bold">v6.0</span>
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Live MongoDB Status Pill */}
+              <button
+                onClick={() => setShowDbModal(true)}
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-[11px] font-mono font-black transition border shadow-sm ${
+                  dbInfo.connected ? 'bg-emerald-50 text-emerald-800 border-emerald-400 hover:bg-emerald-100' : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
+                }`}
+                title="Click to view MongoDB connection details"
+              >
+                <span className={`w-2 h-2 rounded-full ${dbInfo.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
+                <span className="hidden md:inline">{dbInfo.connected ? 'MongoDB Live' : 'Local Mode'}</span>
+                {isSyncing && <span className="animate-spin text-[10px]">🔄</span>}
+              </button>
+
+              {/* Class Leaderboard Button */}
+              <button
+                onClick={fetchLeaderboard}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#fdf6e2] border-2 border-[#701a75] text-[#701a75] text-xs font-black hover:scale-105 transition shadow-sm"
+                title="View enrolled students & rankings"
+              >
+                👥 Class
+              </button>
+
               <div className="hidden lg:flex items-center gap-2 px-3 py-1 rounded-full bg-[#f3e8ff] border border-[#701a75] text-[#701a75] text-xs font-black">
                 <span>👨‍🎓 {user.name} ({user.rollNo})</span>
                 <button onClick={handleLogout} className="text-[10px] bg-[#701a75] text-white px-2 py-0.5 rounded-full hover:bg-red-600 transition ml-1">
@@ -735,33 +974,27 @@
 
               <button
                 onClick={() => setShowBadgeModal(true)}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#f3e8ff] border-2 border-[#701a75] text-[#701a75] text-xs font-black hover:scale-105 transition shadow-sm"
+                className="flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 rounded-full bg-[#f3e8ff] border-2 border-[#701a75] text-[#701a75] text-xs font-black hover:scale-105 transition shadow-sm"
               >
                 🏆 Badges
               </button>
 
-              <div className="hidden sm:flex items-center gap-3 bg-[#fdf6e2] border-2 border-[#78350f]/20 px-4 py-1.5 rounded-full text-xs font-mono">
-                <span className="text-[#78350f] font-extrabold">Overall Progress: <strong className="text-[#701a75]">{getOverallPercent()}%</strong></span>
-                <div className="w-24 bg-white border border-[#78350f]/20 h-2.5 rounded-full overflow-hidden">
+              <div className="hidden sm:flex items-center gap-3 bg-[#fdf6e2] border-2 border-[#78350f]/20 px-3.5 py-1.5 rounded-full text-xs font-mono">
+                <span className="text-[#78350f] font-extrabold">Overall: <strong className="text-[#701a75]">{getOverallPercent()}%</strong></span>
+                <div className="w-20 bg-white border border-[#78350f]/20 h-2.5 rounded-full overflow-hidden">
                   <div className="bg-gradient-to-r from-[#f59e0b] via-[#ec4899] to-[#7e22ce] h-full transition-all duration-500" style={{ width: `${getOverallPercent()}%` }}></div>
                 </div>
               </div>
 
               <button
-                onClick={() => {
-                  if (getOverallPercent() >= 100) {
-                    setShowGraduation(true);
-                  } else {
-                    showNotification(`🔒 Certificate Locked! You must complete all 10 modules (100% course progress) to generate your certificate. Current progress: ${getOverallPercent()}%`, 'error');
-                  }
-                }}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black shadow-md transition ${
+                onClick={handleOpenCertificate}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 rounded-full text-xs font-black shadow-md transition ${
                   getOverallPercent() >= 100
-                    ? 'bg-gradient-to-r from-[#f59e0b] to-[#ec4899] text-white hover:scale-105 cursor-pointer'
+                    ? 'bg-gradient-to-r from-[#f59e0b] to-[#ec4899] text-white hover:scale-105 cursor-pointer animate-pulse'
                     : 'bg-gray-200 text-gray-500 border border-gray-300 opacity-70 cursor-not-allowed'
                 }`}
               >
-                {getOverallPercent() >= 100 ? '🎓 Certificate' : '🔒 Certificate (Locked)'}
+                {getOverallPercent() >= 100 ? '🎓 Certificate' : '🔒 Certificate'}
               </button>
             </div>
           </header>
@@ -927,7 +1160,7 @@
           {/* Colorful Printable Certificate Modal with Entered Student Name */}
           {showGraduation && (
             <div className="fixed inset-0 bg-[#3b0764]/80 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
-              <div className="bg-white border-4 border-[#701a75] p-6 sm:p-10 rounded-3xl max-w-3xl w-full text-center space-y-6 shadow-2xl relative my-auto">
+              <div className="bg-white border-4 border-[#701a75] p-6 sm:p-10 rounded-3xl max-w-3xl w-full text-center space-y-6 shadow-pop relative my-auto">
                 <button onClick={() => setShowGraduation(false)} className="absolute top-4 right-4 text-[#701a75] font-black text-xl hover:scale-110">✕</button>
 
                 <div className="space-y-2">
@@ -951,12 +1184,12 @@
                   <div className="flex justify-between items-center border-b-2 border-[#701a75]/30 pb-4">
                     <div className="text-left font-mono text-[10px] text-[#701a75] font-black">
                       VERIFIED OS VIRTUAL LAB CREDENTIAL<br />
-                      DATE: {new Date().toLocaleDateString()}
+                      DATE: {certData?.issueDate || new Date().toLocaleDateString()}
                     </div>
                     <div className="text-3xl">🏆</div>
                     <div className="text-right font-mono text-[10px] text-[#701a75] font-black">
-                      CERTIFICATE ID: OSV-2026-991A<br />
-                      STATUS: 100% COMPETENCY
+                      CERTIFICATE ID: {certData?.certificateId || 'OSV-2026-991A'}<br />
+                      STATUS: 100% MONGODB VERIFIED ✓
                     </div>
                   </div>
 
@@ -985,6 +1218,134 @@
                     Close Window
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Database Info Modal */}
+          {showDbModal && (
+            <div className="fixed inset-0 bg-[#3b0764]/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
+              <div className="bg-white border-4 border-[#701a75] p-6 sm:p-8 rounded-3xl max-w-lg w-full space-y-5 shadow-2xl relative">
+                <button onClick={() => setShowDbModal(false)} className="absolute top-4 right-4 text-[#701a75] font-black text-xl hover:scale-110">✕</button>
+
+                <div className="text-center space-y-2">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-100 border border-emerald-400 text-emerald-700 flex items-center justify-center text-2xl mx-auto shadow-sm">
+                    🍃
+                  </div>
+                  <h2 className="text-2xl font-black text-[#3b0764]">MongoDB Connection Details</h2>
+                  <p className="text-xs text-[#78350f] font-bold">Real-time persistence for student profiles & lab modules</p>
+                </div>
+
+                <div className="bg-[#fdf6e2] border-2 border-[#701a75]/30 p-4 rounded-2xl space-y-2.5 font-mono text-xs">
+                  <div className="flex justify-between items-center py-1 border-b border-[#701a75]/15">
+                    <span className="text-[#78350f] font-black">Connection State:</span>
+                    <span className={`font-black px-2.5 py-0.5 rounded-full text-[10px] ${
+                      dbInfo.connected ? 'bg-emerald-100 text-emerald-800 border border-emerald-400' : 'bg-red-100 text-red-800 border border-red-400'
+                    }`}>
+                      {dbInfo.connected ? '🟢 ONLINE & CONNECTED' : '🔴 OFFLINE'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-[#701a75]/15">
+                    <span className="text-[#78350f] font-black">Database Name:</span>
+                    <span className="text-[#701a75] font-black">{dbInfo.database || 'os_virtual_lab'}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-[#701a75]/15">
+                    <span className="text-[#78350f] font-black">Host / Port:</span>
+                    <span className="text-[#701a75] font-black">127.0.0.1:27017</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1 border-b border-[#701a75]/15">
+                    <span className="text-[#78350f] font-black">Registered Students in DB:</span>
+                    <span className="text-[#059669] font-black">{dbInfo.students} Students</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[#78350f] font-black">Issued Certificates in DB:</span>
+                    <span className="text-[#701a75] font-black">{dbInfo.certs} Awarded</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[#78350f] font-black">Active Student:</span>
+                    <span className="text-[#ec4899] font-black">{user.name} ({user.rollNo})</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={checkDbStatus}
+                      className="flex-1 py-3 bg-[#701a75] text-white font-black text-xs rounded-xl shadow-md hover:scale-[1.02] transition"
+                    >
+                      🔄 Test & Refresh Connection
+                    </button>
+                    <button
+                      onClick={fetchLeaderboard}
+                      className="flex-1 py-3 bg-[#f3e8ff] border border-[#701a75] text-[#701a75] font-black text-xs rounded-xl shadow-sm hover:scale-[1.02] transition"
+                    >
+                      👥 View Class Records
+                    </button>
+                  </div>
+                  <button
+                    onClick={handleResetDbProgress}
+                    className="w-full py-2 bg-red-50 text-red-700 border border-red-300 font-black text-xs rounded-xl hover:bg-red-100 transition"
+                  >
+                    🗑️ Reset My Progress in Database
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Class Leaderboard Modal */}
+          {showLeaderboardModal && (
+            <div className="fixed inset-0 bg-[#3b0764]/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
+              <div className="bg-white border-4 border-[#701a75] p-6 sm:p-8 rounded-3xl max-w-2xl w-full space-y-5 shadow-2xl relative max-h-[85vh] flex flex-col">
+                <button onClick={() => setShowLeaderboardModal(false)} className="absolute top-4 right-4 text-[#701a75] font-black text-xl hover:scale-110">✕</button>
+
+                <div className="text-center">
+                  <div className="text-3xl">👥</div>
+                  <h2 className="text-2xl font-black text-[#3b0764] mt-1">Class Leaderboard</h2>
+                  <p className="text-xs text-[#78350f] font-bold mt-1">Enrolled students and course progress recorded in MongoDB</p>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1 font-mono text-xs">
+                  {leaderboardData.length === 0 ? (
+                    <div className="text-center p-8 text-gray-500 font-bold bg-[#fdf6e2] rounded-2xl border">
+                      No students enrolled yet or database empty.
+                    </div>
+                  ) : (
+                    leaderboardData.map((s, idx) => (
+                      <div
+                        key={s.rollNo}
+                        className={`p-3.5 rounded-2xl border-2 flex items-center justify-between gap-3 transition ${
+                          s.rollNo === user.rollNo
+                            ? 'bg-[#f3e8ff] border-[#701a75] shadow-sm'
+                            : 'bg-white border-[#701a75]/20'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="w-6 h-6 rounded-full bg-[#701a75] text-white flex items-center justify-center text-[10px] font-black">
+                            #{idx + 1}
+                          </span>
+                          <div>
+                            <div className="font-black text-[#3b0764] text-xs">
+                              {s.name} {s.rollNo === user.rollNo && <span className="text-[10px] bg-[#701a75] text-white px-1.5 py-0.2 rounded-full font-bold ml-1">You</span>}
+                            </div>
+                            <div className="text-[10px] text-[#78350f]">{s.rollNo} • {s.dept}</div>
+                          </div>
+                        </div>
+
+                        <div className="text-right space-y-1">
+                          <div className="text-xs font-black text-[#701a75]">{s.overallPercent}% Completed</div>
+                          <div className="w-24 bg-[#fdf6e2] border border-[#78350f]/20 h-2 rounded-full overflow-hidden">
+                            <div className="bg-gradient-to-r from-[#f59e0b] to-[#ec4899] h-full" style={{ width: `${s.overallPercent}%` }}></div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <button onClick={() => setShowLeaderboardModal(false)} className="w-full py-3 bg-[#701a75] text-white font-black text-xs rounded-xl shadow-md">
+                  Close Leaderboard
+                </button>
               </div>
             </div>
           )}
@@ -1221,7 +1582,7 @@
             <button
               onClick={handleNextTask}
               disabled={currentStep >= 6}
-              className="px-4 py-2.5 rounded-xl bg-[#701a75] text-white font-black hover:scale-105 disabled:opacity-40 transition shadow-sm"
+              className="px-4 py-2.5 rounded-xl bg-[#701a75] text-white font-black hover:scale-105 disabled:opacity-40 transition shadow-md"
             >
               Next Step ➔
             </button>
@@ -1248,7 +1609,7 @@
           <InteractiveExamplePanel moduleId={moduleData.id} />
 
           {learn.analogy && (
-            <div className="bg-[#fef3c7] border-2 border-[#f59e0b] p-5 rounded-2xl flex items-start gap-4 shadow-sm">
+            <div className="bg-[#fef3c7] border-2 border-[#f59e0b] p-5 rounded-xl flex items-start gap-4 shadow-sm">
               <div className="p-2 bg-white rounded-xl text-[#f59e0b] shrink-0 border border-[#f59e0b]">
                 <i data-lucide="lightbulb" className="w-5 h-5"></i>
               </div>
@@ -1488,514 +1849,6 @@
             </div>
           </div>
 
-          <div className="bg-[#f3e8ff] border border-[#701a75] p-3 rounded-xl text-[#701a75] font-black">
-            Holes: [100KB, 500KB, 200KB, 300KB] ➔ Allocated to {strat === 'Best-Fit' ? '300KB Hole (Leftover 88KB)' : strat === 'First-Fit' ? '500KB Hole (Leftover 288KB)' : '500KB Hole (Largest)'}
-          </div>
-        </div>
-      );
-    }
-
-    function PagingExample() {
-      const [addr, setAddr] = useState(2448);
-      const page = Math.floor(addr / 1024);
-      const offset = addr % 1024;
-      const frame = page + 3;
-      const phys = (frame * 1024) + offset;
-
-      return (
-        <div className="space-y-3 font-mono text-xs">
-          <div>
-            <label className="text-[#78350f] font-black">Logical Address (bytes):</label>
-            <input type="number" value={addr} onChange={e => setAddr(Number(e.target.value))} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1.5 rounded-xl font-black text-[#701a75] mt-1" />
-          </div>
-
-          <div className="bg-[#f3e8ff] border border-[#701a75] p-3 rounded-xl text-[#701a75] font-black">
-            Page Number (p) = {page} | Offset (d) = {offset} ➔ Mapped Frame = {frame} ➔ Physical Address = {phys} bytes
-          </div>
-        </div>
-      );
-    }
-
-    function PageReplaceExample() {
-      const [pages, setPages] = useState('7, 0, 1, 2, 0, 3');
-
-      return (
-        <div className="space-y-3 font-mono text-xs">
-          <div>
-            <label className="text-[#78350f] font-black">Page Reference String:</label>
-            <input type="text" value={pages} onChange={e => setPages(e.target.value)} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1.5 rounded-xl font-black text-[#701a75] mt-1" />
-          </div>
-
-          <div className="flex flex-wrap gap-2 text-center">
-            {pages.split(',').map((p, i) => (
-              <div key={i} className="bg-[#f3e8ff] border border-[#701a75] p-2 rounded-xl min-w-[40px]">
-                <div className="text-[#701a75] font-black">{p.trim()}</div>
-                <div className="text-[9px] text-[#ef4444] font-black mt-0.5">FAULT</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    }
-
-    function DiskExample() {
-      const [head, setHead] = useState(50);
-
-      return (
-        <div className="space-y-3 font-mono text-xs">
-          <div>
-            <label className="text-[#78350f] font-black">Initial Head Position:</label>
-            <input type="number" value={head} onChange={e => setHead(Number(e.target.value))} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1.5 rounded-xl font-black text-[#701a75] mt-1" />
-          </div>
-
-          <div className="bg-[#f3e8ff] border border-[#701a75] p-3 rounded-xl text-[#701a75] font-black">
-            SSTF Track Trace: {head} ➔ 43 ➔ 82 ➔ 170 (Calculated Total Seek = {Math.abs(head - 43) + (82 - 43) + (170 - 82)} Cylinders)
-          </div>
-        </div>
-      );
-    }
-
-    function FileSystemExample() {
-      const [fname, setFname] = useState('report.pdf');
-
-      return (
-        <div className="space-y-3 font-mono text-xs">
-          <div>
-            <label className="text-[#78350f] font-black">File Name:</label>
-            <input type="text" value={fname} onChange={e => setFname(e.target.value)} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1.5 rounded-xl font-black text-[#701a75] mt-1" />
-          </div>
-
-          <div className="bg-[#f3e8ff] border border-[#701a75] p-3 rounded-xl text-[#701a75] font-black">
-            Inode Sector #12 ➔ Metadata [{fname} | 42KB] ➔ Index Block #5 Pointers [Sector 14, 18, 22]
-          </div>
-        </div>
-      );
-    }
-
-    // -------------------------------------------------------------
-    // STEP 2: ANIMATION STEP (IN-DEPTH INTERACTIVE CONCEPT SIMULATORS WITH SPEED & PLAYBACK CONTROLS)
-    // -------------------------------------------------------------
-    function AnimationStep({ moduleId, onDone }) {
-      return (
-        <div className="space-y-4 animate-slide-up">
-          <div className="bg-white border-2 border-[#701a75] p-4 rounded-xl text-xs text-[#78350f] font-mono flex flex-wrap items-center justify-between font-black shadow-sm gap-2">
-            <span className="flex items-center gap-2">
-              🎬 Step 2: Full Animated Simulation Sandbox
-            </span>
-            <span className="text-[#701a75] bg-[#f3e8ff] border border-[#701a75] px-2.5 py-1 rounded-full text-[10px]">
-              ▶ Play, Pause, Speed & Custom Student Inputs
-            </span>
-          </div>
-
-          {moduleId === 'process-management' && <ProcessSim />}
-          {moduleId === 'cpu-scheduling' && <CpuSim />}
-          {moduleId === 'threads' && <ThreadSim />}
-          {moduleId === 'process-sync' && <SyncSim />}
-          {moduleId === 'deadlocks' && <DeadlockSim />}
-          {moduleId === 'memory-management' && <MemorySim />}
-          {moduleId === 'paging' && <PagingSim />}
-          {moduleId === 'page-replacement' && <PageReplaceSim />}
-          {moduleId === 'disk-scheduling' && <DiskSim />}
-          {moduleId === 'file-systems' && <FileSystemSim />}
-
-          <button onClick={onDone} className="w-full py-4 bg-gradient-to-r from-[#701a75] to-[#7e22ce] text-white font-black text-sm rounded-xl shadow-md mt-4 hover:scale-[1.01] transition">
-            ✓ Complete Animation & Next Task ➔
-          </button>
-        </div>
-      );
-    }
-
-    // 1. Process Management Simulator
-    function ProcessSim() {
-      const [procs, setProcs] = useState([
-        { id: 'P1', state: 'Ready', priority: 'High', pid: 101 },
-        { id: 'P2', state: 'Running', priority: 'Medium', pid: 102 },
-        { id: 'P3', state: 'Waiting', priority: 'Low', pid: 103 }
-      ]);
-      const [newProcName, setNewProcName] = useState('P4');
-      const states = ['New', 'Ready', 'Running', 'Waiting', 'Terminated'];
-
-      const addProcess = () => {
-        if (!newProcName.trim()) return;
-        setProcs([...procs, { id: newProcName.trim(), state: 'New', priority: 'Medium', pid: 100 + procs.length + 1 }]);
-        setNewProcName(`P${procs.length + 2}`);
-      };
-
-      const moveState = (id, targetState) => {
-        setProcs(procs.map(p => p.id === id ? { ...p, state: targetState } : p));
-      };
-
-      return (
-        <div className="bg-white border-2 border-[#701a75] p-5 rounded-2xl space-y-5 font-mono text-xs shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fdf6e2] border-2 border-[#78350f]/20 p-3 rounded-xl">
-            <div className="flex items-center gap-2">
-              <span className="text-[#78350f] font-black">Add Process:</span>
-              <input type="text" value={newProcName} onChange={e => setNewProcName(e.target.value)} className="w-20 bg-white border border-[#701a75] px-2 py-1 rounded font-black text-[#701a75]" />
-              <button onClick={addProcess} className="px-3 py-1 bg-[#701a75] text-white font-black rounded-lg hover:scale-105 transition">+ Add</button>
-            </div>
-            <div className="text-[11px] text-[#78350f] font-bold">Tip: Click state action buttons below to transition processes</div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-            {states.map(s => {
-              const list = procs.filter(p => p.state === s);
-              return (
-                <div key={s} className="bg-white border-2 border-[#701a75]/30 p-3 rounded-2xl min-h-[220px] flex flex-col justify-between shadow-sm">
-                  <div>
-                    <div className="font-black text-xs text-[#701a75] border-b-2 border-[#701a75]/20 pb-2 mb-2 flex justify-between">
-                      <span>{s}</span>
-                      <span className="font-mono text-[#ec4899] bg-[#f3e8ff] px-2 py-0.5 rounded-full">{list.length}</span>
-                    </div>
-                    <div className="space-y-2">
-                      {list.map(p => (
-                        <div key={p.id} className="bg-[#fdf6e2] p-2.5 rounded-xl border border-[#78350f]/20 font-black space-y-1.5 shadow-sm">
-                          <div className="flex justify-between text-[#3b0764]">
-                            <span>{p.id} (PID {p.pid})</span>
-                            <span className="text-[10px] text-[#701a75]">{p.priority}</span>
-                          </div>
-                          {s === 'New' && (
-                            <button onClick={() => moveState(p.id, 'Ready')} className="w-full py-1 bg-[#701a75] text-white text-[10px] font-black rounded">Admit to Ready ➔</button>
-                          )}
-                          {s === 'Ready' && (
-                            <button onClick={() => moveState(p.id, 'Running')} className="w-full py-1 bg-[#059669] text-white text-[10px] font-black rounded">Dispatch CPU ➔</button>
-                          )}
-                          {s === 'Running' && (
-                            <div className="space-y-1">
-                              <button onClick={() => moveState(p.id, 'Waiting')} className="w-full py-1 bg-[#f59e0b] text-white text-[10px] font-black rounded">I/O Request ➔</button>
-                              <button onClick={() => moveState(p.id, 'Terminated')} className="w-full py-1 bg-[#ef4444] text-white text-[10px] font-black rounded">Exit / Terminate ➔</button>
-                            </div>
-                          )}
-                          {s === 'Waiting' && (
-                            <button onClick={() => moveState(p.id, 'Ready')} className="w-full py-1 bg-[#701a75] text-white text-[10px] font-black rounded">I/O Done ➔ Ready</button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      );
-    }
-
-    // 2. CPU Scheduling Simulator
-    function CpuSim() {
-      const [algo, setAlgo] = useState('FCFS');
-      const [tq, setTq] = useState(2);
-      const [speedMult, setSpeedMult] = useState(1);
-      const [procs, setProcs] = useState([
-        { id: 'P1', burst: 6, arrival: 0 },
-        { id: 'P2', burst: 4, arrival: 1 },
-        { id: 'P3', burst: 8, arrival: 2 }
-      ]);
-      const [step, setStep] = useState(0);
-      const [isPlaying, setIsPlaying] = useState(false);
-
-      useEffect(() => {
-        let timer;
-        const total = procs.reduce((acc, p) => acc + p.burst, 0);
-        if (isPlaying && step < total) {
-          timer = setTimeout(() => setStep(prev => prev + 1), 600 / speedMult);
-        } else if (step >= total) {
-          setIsPlaying(false);
-        }
-        return () => clearTimeout(timer);
-      }, [isPlaying, step, speedMult, procs]);
-
-      const totalBurst = procs.reduce((acc, p) => acc + p.burst, 0);
-
-      return (
-        <div className="bg-white border-2 border-[#701a75] p-5 rounded-2xl space-y-4 font-mono text-xs shadow-sm">
-          {/* Controls Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fdf6e2] border border-[#701a75]/30 p-3 rounded-xl">
-            <div className="flex items-center gap-3">
-              <span className="text-[#78350f] font-black">Algorithm:</span>
-              <select value={algo} onChange={e => { setAlgo(e.target.value); setStep(0); }} className="bg-white border border-[#701a75] text-[#701a75] p-1.5 rounded-xl font-black">
-                <option value="FCFS">FCFS (First-Come First-Served)</option>
-                <option value="SJF">SJF (Shortest Job First)</option>
-                <option value="RR">Round Robin (RR)</option>
-              </select>
-              {algo === 'RR' && (
-                <div className="flex items-center gap-1">
-                  <span className="text-[#78350f] font-black">Quantum (Q):</span>
-                  <input type="number" min="1" max="5" value={tq} onChange={e => setTq(Number(e.target.value))} className="w-12 bg-white border border-[#701a75] p-1 rounded font-black text-[#701a75]" />
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-[#78350f] font-black">Speed:</span>
-              <select value={speedMult} onChange={e => setSpeedMult(Number(e.target.value))} className="bg-white border border-[#701a75] text-[#701a75] p-1 rounded font-black">
-                <option value={0.5}>0.5x</option>
-                <option value={1}>1.0x</option>
-                <option value={2}>2.0x</option>
-              </select>
-              <button onClick={() => setIsPlaying(!isPlaying)} className="px-3.5 py-1.5 bg-[#701a75] text-white font-black rounded-xl hover:scale-105 transition">
-                {isPlaying ? '⏸ Pause' : '▶ Play'}
-              </button>
-              <button onClick={() => setStep(prev => Math.min(prev + 1, totalBurst))} className="px-3 py-1.5 bg-[#ec4899] text-white font-black rounded-xl hover:scale-105 transition">
-                ⏭ Step
-              </button>
-              <button onClick={() => { setStep(0); setIsPlaying(false); }} className="px-3 py-1.5 bg-[#fdf6e2] border border-[#78350f] text-[#78350f] font-black rounded-xl">
-                ↺ Reset
-              </button>
-            </div>
-          </div>
-
-          {/* Custom Student Input Fields */}
-          <div className="grid grid-cols-3 gap-2 bg-white border border-[#701a75]/20 p-3 rounded-xl">
-            {procs.map((p, idx) => (
-              <div key={p.id} className="space-y-1">
-                <label className="text-[#701a75] font-black">{p.id} Burst (ms):</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="20"
-                  value={p.burst}
-                  onChange={e => {
-                    const next = [...procs];
-                    next[idx].burst = Math.max(1, Number(e.target.value));
-                    setProcs(next);
-                    setStep(0);
-                  }}
-                  className="w-full bg-[#fdf6e2] border border-[#701a75] p-1.5 rounded-xl font-black text-[#701a75]"
-                />
-              </div>
-            ))}
-          </div>
-
-          {/* Animated Gantt Timeline */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[#78350f] font-black">Animated CPU Gantt Progress (Time t = {step} ms):</span>
-              <span className="text-[#059669] font-black">Total Duration: {totalBurst} ms</span>
-            </div>
-            <div className="flex border-2 border-[#701a75] rounded-xl h-14 overflow-hidden text-center text-white font-black shadow-inner">
-              <div style={{ width: `${(procs[0].burst/totalBurst)*100}%` }} className={`border-r border-white flex flex-col items-center justify-center transition-all ${step >= procs[0].burst ? 'bg-[#701a75]' : 'bg-[#701a75]/40 opacity-70'}`}>
-                <span>{procs[0].id}</span>
-                <span className="text-[9px]">0 - {procs[0].burst}ms</span>
-              </div>
-              <div style={{ width: `${(procs[1].burst/totalBurst)*100}%` }} className={`border-r border-white flex flex-col items-center justify-center transition-all ${step >= procs[0].burst + procs[1].burst ? 'bg-[#ec4899]' : 'bg-[#ec4899]/40 opacity-70'}`}>
-                <span>{procs[1].id}</span>
-                <span className="text-[9px]">{procs[0].burst} - {procs[0].burst + procs[1].burst}ms</span>
-              </div>
-              <div style={{ width: `${(procs[2].burst/totalBurst)*100}%` }} className={`flex flex-col items-center justify-center transition-all ${step >= totalBurst ? 'bg-[#7e22ce]' : 'bg-[#7e22ce]/40 opacity-70'}`}>
-                <span>{procs[2].id}</span>
-                <span className="text-[9px]">{procs[0].burst + procs[1].burst} - {totalBurst}ms</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // 3. Thread Simulator
-    function ThreadSim() {
-      const [threadCount, setThreadCount] = useState(3);
-      const [useLock, setUseLock] = useState(true);
-      const [counter, setCounter] = useState(0);
-      const [isRunning, setIsRunning] = useState(false);
-
-      const runSim = () => {
-        setIsRunning(true);
-        let val = 0;
-        const target = useLock ? threadCount * 10 : Math.floor(threadCount * 8.5);
-        const interval = setInterval(() => {
-          val += 1;
-          setCounter(val);
-          if (val >= target) {
-            clearInterval(interval);
-            setIsRunning(false);
-          }
-        }, 70);
-      };
-
-      return (
-        <div className="bg-white border-2 border-[#701a75] p-5 rounded-2xl space-y-4 text-xs font-mono shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fdf6e2] p-3 rounded-xl border border-[#701a75]/20">
-            <div className="flex items-center gap-3">
-              <span className="text-[#78350f] font-black">Threads:</span>
-              <input type="range" min="1" max="6" value={threadCount} onChange={e => setThreadCount(Number(e.target.value))} className="accent-[#701a75]" />
-              <span className="font-black text-[#701a75]">{threadCount} Threads</span>
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer text-[#78350f] font-black">
-              <input type="checkbox" checked={useLock} onChange={e => setUseLock(e.target.checked)} className="accent-[#701a75]" />
-              Enable Mutex Lock
-            </label>
-            <button onClick={runSim} disabled={isRunning} className="px-4 py-2 bg-[#701a75] text-white font-black rounded-xl hover:scale-105 transition disabled:opacity-50">
-              {isRunning ? 'Executing...' : '▶ Run Execution'}
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {Array.from({ length: threadCount }).map((_, i) => (
-              <div key={i} className={`p-3 rounded-xl border-2 font-black space-y-1 transition-all ${
-                isRunning ? 'bg-[#f3e8ff] border-[#701a75] animate-pulse' : 'bg-white border-[#701a75]/30'
-              }`}>
-                <div className="text-[#701a75]">Thread #{i + 1}</div>
-                <div className="text-[10px] text-[#78350f]">{useLock ? '✓ Mutex Acquired' : '⚠️ Unlocked Shared Access'}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className={`p-4 rounded-xl border-2 text-center text-sm font-black ${useLock ? 'bg-[#059669]/10 border-[#059669] text-[#059669]' : 'bg-[#ef4444]/10 border-[#ef4444] text-[#ef4444]'}`}>
-            Shared Counter Value = {counter} {useLock ? '(SYNC EXPLICIT: Target Met)' : '(RACE CONDITION CONFLICT)'}
-          </div>
-        </div>
-      );
-    }
-
-    // 4. Process Synchronization Simulator
-    function SyncSim() {
-      const [cap, setCap] = useState(5);
-      const [buffer, setBuffer] = useState(['Item A', 'Item B']);
-
-      const produce = () => {
-        if (buffer.length < cap) {
-          const char = String.fromCharCode(65 + buffer.length);
-          setBuffer([...buffer, `Item ${char}`]);
-        }
-      };
-
-      const consume = () => {
-        if (buffer.length > 0) {
-          setBuffer(buffer.slice(0, -1));
-        }
-      };
-
-      return (
-        <div className="bg-white border-2 border-[#701a75] p-5 rounded-2xl space-y-4 text-xs font-mono shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fdf6e2] p-3 rounded-xl border border-[#701a75]/20">
-            <div className="flex items-center gap-2">
-              <span className="text-[#78350f] font-black">Capacity:</span>
-              <input type="number" min="2" max="8" value={cap} onChange={e => setCap(Number(e.target.value))} className="w-14 bg-white border border-[#701a75] p-1 rounded font-black text-[#701a75]" />
-            </div>
-            <div className="flex gap-2">
-              <button onClick={produce} disabled={buffer.length >= cap} className="px-3.5 py-1.5 bg-[#701a75] text-white font-black rounded-xl hover:scale-105 transition disabled:opacity-40">
-                + Produce Item
-              </button>
-              <button onClick={consume} disabled={buffer.length === 0} className="px-3.5 py-1.5 bg-[#ec4899] text-white font-black rounded-xl hover:scale-105 transition disabled:opacity-40">
-                - Consume Item
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-5 gap-3">
-            {Array.from({ length: cap }).map((_, idx) => (
-              <div key={idx} className={`h-16 rounded-2xl border-2 flex flex-col items-center justify-center font-black transition-all ${
-                buffer[idx] ? 'bg-[#f3e8ff] border-[#701a75] text-[#701a75] shadow-md scale-105' : 'bg-[#fdf6e2] border-[#78350f]/20 text-[#78350f]'
-              }`}>
-                <span>{buffer[idx] || 'Empty'}</span>
-                <span className="text-[9px] text-[#78350f]/70">Slot #{idx}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    }
-
-    // 5. Deadlock Simulator
-    function DeadlockSim() {
-      const [algo, setAlgo] = useState('bankers');
-      const [alloc, setAlloc] = useState([2, 1, 1]);
-      const [max, setMax] = useState([4, 3, 3]);
-      const [avail, setAvail] = useState([3, 2, 2]);
-
-      const need = max.map((m, i) => Math.max(0, m - alloc[i]));
-      const isSafe = need.every((n, i) => n <= avail[i]);
-
-      return (
-        <div className="bg-white border-2 border-[#701a75] p-5 rounded-2xl space-y-4 text-xs font-mono shadow-sm">
-          {/* Algorithm Selector Header */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fdf6e2] p-3 rounded-xl border border-[#701a75]/20">
-            <div className="flex items-center gap-3">
-              <span className="text-[#78350f] font-black">Deadlock Algorithm:</span>
-              <select value={algo} onChange={e => setAlgo(e.target.value)} className="bg-white border border-[#701a75] text-[#701a75] p-1.5 rounded-xl font-black">
-                <option value="bankers">Banker's Safety Algorithm (Avoidance)</option>
-                <option value="rag">Resource Allocation Graph (RAG) Cycle Detection</option>
-                <option value="prevention">Deadlock Prevention (Coffman Breaking)</option>
-                <option value="waitfor">Wait-For Graph Dependency Analysis</option>
-              </select>
-            </div>
-            <span className="text-[10px] bg-[#f3e8ff] border border-[#701a75] text-[#701a75] px-2.5 py-1 rounded-full font-black">
-              {algo === 'bankers' ? 'Dynamic Matrix Check' : algo === 'rag' ? 'Directed Graph Cycle' : algo === 'prevention' ? 'Preemption Rules' : 'Wait Graph'}
-            </span>
-          </div>
-
-          {/* Dynamic Inputs */}
-          {algo === 'bankers' && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-3 gap-3 bg-white border border-[#701a75]/20 p-3 rounded-xl text-center">
-                <div>
-                  <label className="text-[#701a75] font-black">P0 Allocation (R1,R2,R3):</label>
-                  <div className="flex gap-1 mt-1 justify-center">
-                    {alloc.map((v, i) => (
-                      <input key={i} type="number" min="0" value={v} onChange={e => {
-                        const next = [...alloc]; next[i] = Number(e.target.value); setAlloc(next);
-                      }} className="w-10 bg-[#fdf6e2] border border-[#701a75] p-1 rounded font-black text-center text-[#701a75]" />
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[#701a75] font-black">P0 Max Demand (R1,R2,R3):</label>
-                  <div className="flex gap-1 mt-1 justify-center">
-                    {max.map((v, i) => (
-                      <input key={i} type="number" min="0" value={v} onChange={e => {
-                        const next = [...max]; next[i] = Number(e.target.value); setMax(next);
-                      }} className="w-10 bg-[#fdf6e2] border border-[#701a75] p-1 rounded font-black text-center text-[#701a75]" />
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[#701a75] font-black">Available Vectors (R1,R2,R3):</label>
-                  <div className="flex gap-1 mt-1 justify-center">
-                    {avail.map((v, i) => (
-                      <input key={i} type="number" min="0" value={v} onChange={e => {
-                        const next = [...avail]; next[i] = Number(e.target.value); setAvail(next);
-                      }} className="w-10 bg-[#fdf6e2] border border-[#701a75] p-1 rounded font-black text-center text-[#701a75]" />
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-[#f3e8ff] border border-[#701a75] p-3 rounded-xl text-[#701a75] font-black text-center">
-                Calculated Need Matrix = Max - Allocation = [{need.join(', ')}] | Available = [{avail.join(', ')}]
-              </div>
-            </div>
-          )}
-
-          <div className={`p-4 rounded-xl border-2 text-center text-sm font-black ${isSafe ? 'bg-[#059669]/10 border-[#059669] text-[#059669]' : 'bg-[#ef4444]/10 border-[#ef4444] text-[#ef4444]'}`}>
-            {isSafe ? 'SYSTEM SAFE STATE: Safe Execution Sequence Found: < P1 → P3 → P2 >' : 'DEADLOCK RISK DETECTED: Need exceeds Available Resources!'}
-          </div>
-        </div>
-      );
-    }
-
-    // 6. Memory Management Simulator
-    function MemorySim() {
-      const [req, setReq] = useState(212);
-      const [strat, setStrat] = useState('Best-Fit');
-
-      return (
-        <div className="bg-white border-2 border-[#701a75] p-5 rounded-2xl space-y-4 text-xs font-mono shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fdf6e2] p-3 rounded-xl border border-[#701a75]/20">
-            <div className="flex items-center gap-2">
-              <span className="text-[#78350f] font-black">Process Request:</span>
-              <input type="number" value={req} onChange={e => setReq(Number(e.target.value))} className="w-20 bg-white border border-[#701a75] px-2 py-1 rounded font-black text-[#701a75]" />
-              <span className="text-[#78350f]">KB</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[#78350f] font-black">Strategy:</span>
-              <select value={strat} onChange={e => setStrat(e.target.value)} className="bg-white border border-[#701a75] text-[#701a75] p-1.5 rounded-xl font-black">
-                <option value="First-Fit">First-Fit</option>
-                <option value="Best-Fit">Best-Fit</option>
-                <option value="Worst-Fit">Worst-Fit</option>
-              </select>
-            </div>
-          </div>
-
           <div className="space-y-2">
             <div className="text-[#78350f] font-black">RAM Hole Partition Layout (Total 1100 KB):</div>
             <div className="flex h-14 border-2 border-[#701a75] rounded-xl overflow-hidden text-center text-white font-black shadow-inner">
@@ -2024,28 +1877,30 @@
 
       return (
         <div className="bg-white border-2 border-[#701a75] p-5 rounded-2xl space-y-4 text-xs font-mono shadow-sm">
-          <div className="flex items-center gap-3 bg-[#fdf6e2] p-3 rounded-xl border border-[#701a75]/20">
-            <span className="text-[#78350f] font-black">Logical Address:</span>
-            <input type="number" value={addr} onChange={e => setAddr(Number(e.target.value))} className="w-28 bg-white border border-[#701a75] px-2 py-1 rounded font-black text-[#701a75]" />
-            <span className="text-[#78350f]">bytes</span>
+          {/* Controls Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fdf6e2] border border-[#701a75]/30 p-3 rounded-xl">
+            <div className="flex items-center gap-3">
+              <span className="text-[#78350f] font-black">Initial Logical Address:</span>
+              <input type="number" value={addr} onChange={e => setAddr(Number(e.target.value))} className="w-28 bg-white border border-[#701a75] px-2 py-1 rounded font-black text-[#701a75]" />
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
-            <div className="bg-[#f3e8ff] border-2 border-[#701a75] p-3 rounded-xl text-[#701a75] font-black space-y-1">
-              <div>Logical Address</div>
-              <div className="text-sm font-black">{addr} B</div>
-              <div className="text-[10px] text-[#78350f]">Page p={page}, Offset d={offset}</div>
+          {/* Address Breakdown & Calculation Result */}
+          <div className="bg-[#f3e8ff] border-2 border-[#701a75] p-4 rounded-xl space-y-2">
+            <div className="text-[#701a75] font-black text-sm">Logical Address Breakdown:</div>
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div className="bg-white border border-[#701a75] p-3 rounded-xl">
+                <div className="text-xs text-[#78350f] font-black">Page Number (p)</div>
+                <div className="text-2xl font-black">{page}</div>
+              </div>
+              <div className="bg-white border border-[#701a75] p-3 rounded-xl">
+                <div className="text-xs text-[#78350f] font-black">Offset (d)</div>
+                <div className="text-2xl font-black">{offset}</div>
+              </div>
             </div>
-            <div className="bg-[#fef3c7] border-2 border-[#f59e0b] p-3 rounded-xl text-[#78350f] font-black space-y-1">
-              <div>TLB & Page Table Lookup</div>
-              <div className="text-sm font-black text-[#059669]">TLB HIT ⚡</div>
-              <div className="text-[10px]">Page {page} ➔ Frame {frame}</div>
-            </div>
-            <div className="bg-[#059669]/10 border-2 border-[#059669] p-3 rounded-xl text-[#059669] font-black space-y-1">
-              <div>Physical Address RAM</div>
-              <div className="text-sm font-black">{phys} B</div>
-              <div className="text-[10px]">({frame} × 1024) + {offset}</div>
-            </div>
+
+            <div className="text-[#701a75] font-black text-sm">Calculated Physical Address:</div>
+            <div className="text-2xl font-black">{phys} bytes</div>
           </div>
         </div>
       );
@@ -2158,137 +2013,6 @@
               <button onClick={() => setIsPlaying(!isPlaying)} className="px-3.5 py-1.5 bg-[#701a75] text-white font-black rounded-xl hover:scale-105 transition">
                 {isPlaying ? '⏸ Pause' : '▶ Play'}
               </button>
-              <button onClick={() => setStep(prev => Math.min(prev + 1, pageList.length))} className="px-3 py-1.5 bg-[#ec4899] text-white font-black rounded-xl hover:scale-105 transition">
-                ⏭ Step
-              </button>
-              <button onClick={() => { setStep(0); setIsPlaying(false); }} className="px-3 py-1.5 bg-[#fdf6e2] border border-[#78350f] text-[#78350f] font-black rounded-xl">
-                ↺ Reset
-              </button>
-            </div>
-          </div>
-
-          {/* Custom Student Input Reference String */}
-          <div className="flex items-center gap-3 bg-white border border-[#701a75]/20 p-3 rounded-xl">
-            <span className="text-[#78350f] font-black">Page Reference String:</span>
-            <input type="text" value={pagesStr} onChange={e => { setPagesStr(e.target.value); setStep(0); }} className="flex-1 bg-[#fdf6e2] border border-[#701a75] px-2 py-1 rounded font-black text-[#701a75]" />
-          </div>
-
-          {/* Animated Page Grid */}
-          <div className="space-y-2">
-            <div className="flex justify-between text-[#78350f] font-black">
-              <span>Page Replacement Execution Trace ({algo}):</span>
-              <span>Step {activeTrace.length} / {pageList.length}</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {activeTrace.map((t, idx) => (
-                <div key={idx} className={`p-3 rounded-xl border-2 text-center min-w-[60px] space-y-1 transition-all ${
-                  t.hit ? 'bg-[#059669]/10 border-[#059669] text-[#059669]' : 'bg-[#ef4444]/10 border-[#ef4444] text-[#ef4444]'
-                }`}>
-                  <div className="font-black text-sm">{t.page}</div>
-                  <div className={`text-[9px] font-black px-1 py-0.5 rounded text-white ${t.hit ? 'bg-[#059669]' : 'bg-[#ef4444]'}`}>
-                    {t.hit ? 'HIT' : 'FAULT'}
-                  </div>
-                  <div className="text-[8px] text-gray-500 font-mono">[{t.framesSnapshot.join(',')}]</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="bg-[#f3e8ff] border border-[#701a75] p-2.5 rounded-xl text-[#701a75] font-black">Page Faults: {currentFaults}</div>
-            <div className="bg-[#f3e8ff] border border-[#701a75] p-2.5 rounded-xl text-[#701a75] font-black">Page Hits: {currentHits}</div>
-            <div className="bg-[#059669]/10 border border-[#059669] p-2.5 rounded-xl text-[#059669] font-black">Hit Ratio: {hitRatio}%</div>
-          </div>
-        </div>
-      );
-    }
-
-    // 9. Disk Scheduling Simulator (FCFS → SSTF → SCAN → C-SCAN → LOOK → C-LOOK WITH DROPDOWN SELECTOR)
-    function DiskSim() {
-      const [algo, setAlgo] = useState('SSTF');
-      const [head, setHead] = useState(50);
-      const [queueStr, setQueueStr] = useState('82, 170, 43, 140, 24, 16, 190');
-      const [step, setStep] = useState(0);
-      const [isPlaying, setIsPlaying] = useState(false);
-      const [speedMult, setSpeedMult] = useState(1);
-
-      const queue = queueStr.split(',').map(s => Number(s.trim())).filter(n => !isNaN(n));
-
-      // Calculate path according to chosen algorithm
-      let path = [head];
-      if (algo === 'FCFS') {
-        path = [head, ...queue];
-      } else if (algo === 'SSTF') {
-        let curr = head;
-        let unvisited = [...queue];
-        while (unvisited.length > 0) {
-          unvisited.sort((a, b) => Math.abs(a - curr) - Math.abs(b - curr));
-          curr = unvisited.shift();
-          path.push(curr);
-        }
-      } else if (algo === 'SCAN') {
-        const left = queue.filter(q => q < head).sort((a, b) => b - a);
-        const right = queue.filter(q => q >= head).sort((a, b) => a - b);
-        path = [head, ...right, 199, ...left];
-      } else if (algo === 'C-SCAN') {
-        const left = queue.filter(q => q < head).sort((a, b) => a - b);
-        const right = queue.filter(q => q >= head).sort((a, b) => a - b);
-        path = [head, ...right, 199, 0, ...left];
-      } else if (algo === 'LOOK') {
-        const left = queue.filter(q => q < head).sort((a, b) => b - a);
-        const right = queue.filter(q => q >= head).sort((a, b) => a - b);
-        path = [head, ...right, ...left];
-      } else if (algo === 'C-LOOK') {
-        const left = queue.filter(q => q < head).sort((a, b) => a - b);
-        const right = queue.filter(q => q >= head).sort((a, b) => a - b);
-        path = [head, ...right, ...left];
-      }
-
-      useEffect(() => {
-        let timer;
-        if (isPlaying && step < path.length - 1) {
-          timer = setTimeout(() => setStep(prev => prev + 1), 600 / speedMult);
-        } else if (step >= path.length - 1) {
-          setIsPlaying(false);
-        }
-        return () => clearTimeout(timer);
-      }, [isPlaying, step, speedMult, path.length]);
-
-      // Calculate total seek distance up to current step
-      let totalSeek = 0;
-      for (let i = 0; i < step; i++) {
-        totalSeek += Math.abs(path[i + 1] - path[i]);
-      }
-
-      const activeHead = path[Math.min(step, path.length - 1)];
-
-      return (
-        <div className="bg-white border-2 border-[#701a75] p-5 rounded-2xl space-y-4 font-mono text-xs shadow-sm">
-          {/* Controls Header */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fdf6e2] border border-[#701a75]/30 p-3 rounded-xl">
-            <div className="flex items-center gap-3">
-              <span className="text-[#78350f] font-black">Disk Algorithm:</span>
-              <select value={algo} onChange={e => { setAlgo(e.target.value); setStep(0); }} className="bg-white border border-[#701a75] text-[#701a75] p-1.5 rounded-xl font-black">
-                <option value="FCFS">FCFS (First-Come First-Served)</option>
-                <option value="SSTF">SSTF (Shortest Seek Time First)</option>
-                <option value="SCAN">SCAN (Elevator)</option>
-                <option value="C-SCAN">C-SCAN (Circular SCAN)</option>
-                <option value="LOOK">LOOK</option>
-                <option value="C-LOOK">C-LOOK (Circular LOOK)</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <span className="text-[#78350f] font-black">Speed:</span>
-              <select value={speedMult} onChange={e => setSpeedMult(Number(e.target.value))} className="bg-white border border-[#701a75] text-[#701a75] p-1 rounded font-black">
-                <option value={0.5}>0.5x</option>
-                <option value={1}>1.0x</option>
-                <option value={2}>2.0x</option>
-              </select>
-
-              <button onClick={() => setIsPlaying(!isPlaying)} className="px-3.5 py-1.5 bg-[#701a75] text-white font-black rounded-xl hover:scale-105 transition">
-                {isPlaying ? '⏸ Pause' : '▶ Play'}
-              </button>
               <button onClick={() => setStep(prev => Math.min(prev + 1, path.length - 1))} className="px-3 py-1.5 bg-[#ec4899] text-white font-black rounded-xl hover:scale-105 transition">
                 ⏭ Step
               </button>
@@ -2338,7 +2062,7 @@
 
       return (
         <div className="bg-white border-2 border-[#701a75] p-5 rounded-2xl space-y-4 text-xs font-mono shadow-sm">
-          {/* Method Selector */}
+          {/* Method Selector Header */}
           <div className="flex flex-wrap items-center justify-between gap-3 bg-[#fdf6e2] p-3 rounded-xl border border-[#701a75]/20">
             <div className="flex items-center gap-3">
               <span className="text-[#78350f] font-black">File Allocation Method:</span>
@@ -2348,6 +2072,9 @@
                 <option value="indexed">Indexed Allocation (Index Block / Inode)</option>
               </select>
             </div>
+            <span className="text-[10px] bg-[#f3e8ff] border border-[#701a75] text-[#701a75] px-2.5 py-1 rounded-full font-black">
+              {method === 'contiguous' ? 'Continuous Blocks' : method === 'linked' ? 'Pointer Chains' : 'Index Block'}
+            </span>
           </div>
 
           {/* Main Idea Explanation Card */}
@@ -2371,8 +2098,8 @@
               <input type="text" value={fname} onChange={e => setFname(e.target.value)} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1 rounded font-black text-[#701a75]" />
             </div>
             <div className="space-y-1">
-              <label className="text-[#701a75] font-black">File Size ({numBlocks} Blocks):</label>
-              <input type="range" min="1" max="6" value={numBlocks} onChange={e => setNumBlocks(Number(e.target.value))} className="w-full accent-[#701a75]" />
+              <label className="text-[#701a75] font-black">Number of Blocks:</label>
+              <input type="number" value={numBlocks} onChange={e => setNumBlocks(Math.max(1, Math.min(6, Number(e.target.value))))} className="w-full bg-[#fdf6e2] border border-[#701a75] p-1 rounded font-black text-[#701a75]" />
             </div>
           </div>
 
